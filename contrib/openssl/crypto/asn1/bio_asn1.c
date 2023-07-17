@@ -79,10 +79,8 @@ static int asn1_bio_setup_ex(BIO *b, BIO_ASN1_BUF_CTX *ctx,
 static const BIO_METHOD methods_asn1 = {
     BIO_TYPE_ASN1,
     "asn1",
-    /* TODO: Convert to new style write function */
     bwrite_conv,
     asn1_bio_write,
-    /* TODO: Convert to new style read function */
     bread_conv,
     asn1_bio_read,
     asn1_bio_puts,
@@ -139,6 +137,11 @@ static int asn1_bio_free(BIO *b)
     ctx = BIO_get_data(b);
     if (ctx == NULL)
         return 0;
+
+    if (ctx->prefix_free != NULL)
+        ctx->prefix_free(b, &ctx->ex_buf, &ctx->ex_len, &ctx->ex_arg);
+    if (ctx->suffix_free != NULL)
+        ctx->suffix_free(b, &ctx->ex_buf, &ctx->ex_len, &ctx->ex_arg);
 
     OPENSSL_free(ctx->buf);
     OPENSSL_free(ctx);

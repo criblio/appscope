@@ -11,6 +11,7 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "com.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "state.h"
 #include "scopestdlib.h"
@@ -49,6 +50,7 @@ struct _ctl_t
     cbuf_handle_t events;
     unsigned enhancefs;
     bool allow_binary_console;
+    bool stop_aggregating;
 
     // Used to buffer (aggregate) log and console data
     struct {
@@ -56,7 +58,6 @@ struct _ctl_t
         cbuf_handle_t ringbuf;
 
         // storage for aggregating log and console data
-        int stop_aggregating;
         streambuf_t streamAgg[FS_ENTRIES];
 
         // limits for how much raw data to aggregate
@@ -66,8 +67,9 @@ struct _ctl_t
     } log;
 
     struct {
-        unsigned int enable;
+        payload_status_t status;
         char * dir;
+        char * dirRepr;         // human-representation of dir variable: dir://<dir value> (TODO: Unify this with dir)
         cbuf_handle_t ringbuf;
     } payload;
 
@@ -97,8 +99,8 @@ typedef struct {
 } switch_map_t;
 
 static switch_map_t switch_map[] = {
-    {"redirect-on",      URL_REDIRECT_ON},
-    {"redirect-off",     URL_REDIRECT_OFF},
+    {"detach",           FUNC_DETACH},
+    {"attach",           FUNC_ATTACH},
     {NULL,               NO_ACTION}
 };
 
@@ -584,7 +586,7 @@ ctlCreate()
 
     size_t buf_size = DEFAULT_CBUF_SIZE;
     char *qlen_str;
-    if ((qlen_str = getenv("SCOPE_QUEUE_LENGTH")) != NULL) {
+    if ((qlen_str = fullGetEnv("SCOPE_QUEUE_LENGTH")) != NULL) {
         unsigned long qlen;
         scope_errno = 0;
         qlen = scope_strtoul(qlen_str, NULL, 10);
@@ -609,9 +611,16 @@ ctlCreate()
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
     ctl->allow_binary_console = DEFAULT_ALLOW_BINARY_CONSOLE;
+    ctl->stop_aggregating = FALSE;
 
-    ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
+    ctl->payload.status = PAYLOAD_STATUS_DISABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+    ctl->payload.dirRepr = NULL;
+    if (DEFAULT_PAYLOAD_DIR_REPR) {
+        if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+            ctl->payload.dirRepr = NULL;
+        }
+    }
     ctl->payload.ringbuf = cbufInit(buf_size);
 
     if (!ctl->payload.ringbuf) {
@@ -642,7 +651,13 @@ ctlDestroy(ctl_t **ctl)
     cbufFree((*ctl)->msgbuf);
     cbufFree((*ctl)->events);
 
-    if ((*ctl)->payload.dir) scope_free((*ctl)->payload.dir);
+    if ((*ctl)->payload.dir) {
+        scope_free((*ctl)->payload.dir);
+    }
+    if ((*ctl)->payload.dirRepr) {
+        scope_free((*ctl)->payload.dirRepr);
+    }
+
     cbufFree((*ctl)->payload.ringbuf);
 
     transportDestroy(&(*ctl)->transport);
@@ -792,14 +807,14 @@ ctlPostEvent(ctl_t *ctl, char *event)
 {
     if (!event) return -1;
     if (!ctl) {
-        scope_free(event);
+        evtFree((evt_type *)event);
         return -1;
     }
 
     if (cbufPut(ctl->events, (uint64_t)event) == -1) {
         // Full; drop and ignore
         DBG(NULL);
-        scope_free(event);
+        evtFree((evt_type *)event);
         return -1;
     }
     return 0;
@@ -884,7 +899,7 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
         // Report only first event of binary data, drop and ignore rest
         if (cur_data_content == FS_CONTENT_BINARY) {
             if (prev_data_content != FS_CONTENT_BINARY) {
-                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, C_STRLEN(BINARY_DATA_MSG), uid, proc, logType, filter);
             } else {
                 return -1;
             }
@@ -1008,7 +1023,7 @@ ctlSendAllAggregatedLogData(ctl_t *ctl)
     // If our process is exiting or this ctl is going away, report all now.
     // Otherwise, send the data once out of every flush_period_in_ms.
     // (Note that this code assumes it's called once per ms.)
-    int report_now = ctl->log.stop_aggregating;
+    int report_now = ctlProcessAllQueuedEventsNow(ctl);
     report_now |= !(count++ % ctl->log.flush_period_in_ms);
     if (!report_now) return;
 
@@ -1092,7 +1107,14 @@ void
 ctlStopAggregating(ctl_t *ctl)
 {
     if (!ctl) return;
-    ctl->log.stop_aggregating = TRUE;
+    ctl->stop_aggregating = TRUE;
+}
+
+bool
+ctlProcessAllQueuedEventsNow(ctl_t *ctl)
+{
+    if (!ctl) return FALSE;
+    return ctl->stop_aggregating;
 }
 
 void
@@ -1110,7 +1132,7 @@ ctlNeedsConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportNeedsConnection(ctl->paytrans) :
         transportNeedsConnection(ctl->transport);
 }
@@ -1120,7 +1142,7 @@ ctlConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnection(ctl->paytrans) :
         transportConnection(ctl->transport);
 }
@@ -1130,19 +1152,9 @@ ctlConnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnect(ctl->paytrans) :
         transportConnect(ctl->transport);
-}
-
-uint64_t
-ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return 0;
-
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
-        transportConnectAttempts(ctl->paytrans) :
-        transportConnectAttempts(ctl->transport);
 }
 
 int
@@ -1150,7 +1162,7 @@ ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportDisconnect(ctl->paytrans) :
         transportDisconnect(ctl->transport);
 }
@@ -1160,19 +1172,9 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportReconnect(ctl->paytrans) :
         transportReconnect(ctl->transport);
-}
-
-net_fail_t
-ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return 0;
-
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
-        transportFailureReason(ctl->paytrans) :
-        transportFailureReason(ctl->transport);
 }
 
 void
@@ -1203,7 +1205,7 @@ ctlTransportType(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return (cfg_transport_t)-1;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportType(ctl->paytrans) :
         transportType(ctl->transport);
 }
@@ -1222,6 +1224,36 @@ evt_fmt_t *
 ctlEvtGet(ctl_t *ctl)
 {
     return ctl ? ctl->evt : NULL;
+}
+
+static transport_status_t
+ctlPayConnectionStatus(ctl_t * ctl, payload_status_t payStatus) {
+    transport_status_t status = {
+        .configString = NULL,
+        .isConnected = FALSE,
+        .connectAttemptCount = 0,
+        .failureString = NULL};
+
+    if ((!ctl) || (payStatus != PAYLOAD_STATUS_DISK)) {
+        return status;
+    }
+
+    status.configString = ctl->payload.dirRepr;
+    status.isConnected = TRUE;
+
+    return status;
+}
+
+transport_status_t
+ctlConnectionStatus(ctl_t *ctl, which_transport_t who) {
+    if (who == CFG_LS) {
+        payload_status_t status = ctlPayStatus(ctl);
+        if (status == PAYLOAD_STATUS_CRIBL) {
+            return transportConnectionStatus(ctl->paytrans);
+        }
+        return ctlPayConnectionStatus(ctl, status);
+    }
+    return transportConnectionStatus(ctl->transport);
 }
 
 bool
@@ -1249,17 +1281,17 @@ ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
     ctl->enhancefs = val;
 }
 
-unsigned int
-ctlPayEnable(ctl_t *ctl)
+payload_status_t
+ctlPayStatus(ctl_t *ctl)
 {
-    return (ctl) ? ctl->payload.enable : DEFAULT_PAYLOAD_ENABLE;
+    return (ctl) ? ctl->payload.status : PAYLOAD_STATUS_DISABLE;
 }
 
 void
-ctlPayEnableSet(ctl_t *ctl, unsigned int val)
+ctlPayStatusSet(ctl_t *ctl, payload_status_t val)
 {
     if (!ctl) return;
-    ctl->payload.enable = val;
+    ctl->payload.status = val;
 }
 
 const char *
@@ -1272,13 +1304,27 @@ void
 ctlPayDirSet(ctl_t *ctl, const char *dir)
 {
     if (!ctl) return;
-    if (ctl->payload.dir) scope_free(ctl->payload.dir);
+    if (ctl->payload.dir) {
+        scope_free(ctl->payload.dir);
+    }
+    if (ctl->payload.dirRepr) {
+        scope_free(ctl->payload.dirRepr);
+    }
     if (!dir || (dir[0] == '\0')) {
         ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+        ctl->payload.dirRepr = NULL;
+        if (DEFAULT_PAYLOAD_DIR_REPR) {
+            if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+                ctl->payload.dirRepr = NULL;
+            }
+        }
         return;
     }
 
     ctl->payload.dir = scope_strdup(dir);
+    if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+        ctl->payload.dirRepr = NULL;
+    }
 }
 
 void

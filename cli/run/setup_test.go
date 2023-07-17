@@ -1,10 +1,8 @@
 package run
 
 import (
-	"bytes"
 	"crypto/md5"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,61 +11,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateLdscope(t *testing.T) {
-	tmpLdscope := filepath.Join(".foo", "ldscope")
-	os.Setenv("SCOPE_HOME", ".foo")
-	internal.InitConfig()
-	err := createLdscope()
-	assert.NoError(t, err)
-
-	wb, _ := Asset("build/ldscope")
-	hash1 := md5.Sum(wb)
-	fb, _ := ioutil.ReadFile(tmpLdscope)
-	hash2 := md5.Sum(fb)
-	assert.Equal(t, hash1, hash2)
-
-	fb, _ = ioutil.ReadFile("../build/ldscope")
-	hash3 := md5.Sum(fb)
-	assert.Equal(t, hash2, hash3)
-
-	// Call again, should use cached copy
-	err = createLdscope()
-	assert.NoError(t, err)
-
-	os.Chtimes(tmpLdscope, time.Now(), time.Now())
-	ldscopeInfo, _ := AssetInfo("build/ldscope")
-	stat, _ := os.Stat(tmpLdscope)
-	assert.NotEqual(t, ldscopeInfo.ModTime(), stat.ModTime())
-	err = createLdscope()
-	assert.NoError(t, err)
-	stat, _ = os.Stat(tmpLdscope)
-	assert.Equal(t, ldscopeInfo.ModTime(), stat.ModTime())
-
-	os.RemoveAll(".foo")
-	os.Unsetenv("SCOPE_HOME")
-}
-
 func TestCreateAll(t *testing.T) {
 	os.MkdirAll(".foo", 0755)
 	CreateAll(".foo")
-	files := []string{"ldscope", "libscope.so", "scope.yml"}
-	perms := []os.FileMode{0755, 0755, 0644}
+	files := []string{"libscope.so", "scope.yml"}
+	perms := []os.FileMode{0755, 0644}
 	for i, f := range files {
 		path := fmt.Sprintf(".foo/%s", f)
 		stat, _ := os.Stat(path)
 		assert.Equal(t, stat.Mode(), perms[i])
 		wb, _ := Asset(fmt.Sprintf("build/%s", f))
 		hash1 := md5.Sum(wb)
-		fb, _ := ioutil.ReadFile(path)
+		fb, _ := os.ReadFile(path)
 		hash2 := md5.Sum(fb)
 		assert.Equal(t, hash1, hash2)
 
-		fb, _ = ioutil.ReadFile(fmt.Sprintf("../build/%s", f))
+		fb, _ = os.ReadFile(fmt.Sprintf("../build/%s", f))
 		hash3 := md5.Sum(fb)
 		assert.Equal(t, hash2, hash3)
 	}
@@ -91,6 +54,7 @@ func TestEnvironNoScope(t *testing.T) {
 	assert.False(t, hasScope(os.Environ()))
 }
 
+/* Todo this should be an integration test
 func TestCreateWorkDir(t *testing.T) {
 	// Test CreateWorkDir, fail first
 	f, err := os.OpenFile(".test", os.O_RDONLY|os.O_CREATE, 0400)
@@ -126,6 +90,7 @@ func TestCreateWorkDir(t *testing.T) {
 	assert.True(t, exists)
 	os.RemoveAll(".test")
 }
+*/
 
 func testDefaultScopeConfigYaml(wd string, verbosity int) string {
 	wd, _ = filepath.Abs(wd)
@@ -195,26 +160,29 @@ event:
     field: .*
     value: .*
 libscope:
-  configevent: false
+  configevent: true
   summaryperiod: 10
   commanddir: CMDDIR
   log:
     level: warning
     transport:
       type: file
-      path: LDSCOPELOGPATH
+      path: LIBSCOPELOGPATH
       buffering: line
       tls:
         enable: false
         validateserver: false
         cacertpath: ""
+  snapshot:
+    coredump: false
+    backtrace: false
 `
 
 	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)
 	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "EVENTSPATH", filepath.Join(wd, "events.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CMDDIR", filepath.Join(wd, "cmd"), 1)
-	expectedYaml = strings.Replace(expectedYaml, "LDSCOPELOGPATH", filepath.Join(wd, "ldscope.log"), 1)
+	expectedYaml = strings.Replace(expectedYaml, "LIBSCOPELOGPATH", filepath.Join(wd, "libscope.log"), 1)
 	return expectedYaml
 }
 
@@ -228,13 +196,13 @@ func TestSetupWorkDir(t *testing.T) {
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
-	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
+	argsJSONBytes, err := os.ReadFile(filepath.Join(wd, "args.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, `["/bin/foo"]`, string(argsJSONBytes))
 
 	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 
-	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
+	scopeYAMLBytes, err := os.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)
 	assert.Equal(t, expectedYaml, string(scopeYAMLBytes))
 
@@ -253,18 +221,23 @@ func TestSetupWorkDirAttach(t *testing.T) {
 	os.Setenv("SCOPE_TEST", "true")
 	rc := Config{}
 	rc.now = func() time.Time { return time.Unix(0, 0) }
-	rc.setupWorkDir([]string{"123"}, true)
-	wd := fmt.Sprintf("%s_%d_%d_%d", "/tmp/123", 1, os.Getpid(), 0)
+	cmd := exec.Command("sleep", "600")
+	err := cmd.Start()
+	assert.Nil(t, err)
+	defer cmd.Process.Kill()
+	pid := cmd.Process.Pid
+	rc.setupWorkDir([]string{strconv.Itoa(pid)}, true)
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".foo/history/sleep", 1, pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
-	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
+	argsJSONBytes, err := os.ReadFile(filepath.Join(wd, "args.json"))
 	assert.NoError(t, err)
-	assert.Equal(t, `["123"]`, string(argsJSONBytes))
+	assert.Equal(t, `["sleep","600"]`, string(argsJSONBytes))
 
-	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
+	expectedYaml := testDefaultScopeConfigYaml(filepath.Join("/tmp", filepath.Base(wd)), 4)
 
-	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
+	scopeYAMLBytes, err := os.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)
 	assert.Equal(t, expectedYaml, string(scopeYAMLBytes))
 

@@ -6,7 +6,7 @@ title: Using the Library
 
 To use the library for the first time in a given environment, complete this quick procedure:
 
-1. [Download](downloading) AppScope. 
+1. [Download](/docs/downloading) AppScope. 
 2. Decide on a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading#where-from) in your environment.
 3. Set `SCOPE_HOME` to the desired directory.
    ```
@@ -21,13 +21,12 @@ To use the library for the first time in a given environment, complete this quic
    ubuntu@my_hostname:~/someuser/temp$ sudo ./scope extract $SCOPE_HOME
    Successfully extracted to /opt/appscope.
    ```
-6. Verify that `SCOPE_HOME` contains the AppScope library (`libscope.so`), the `ldscope` utility, and the config file (`scope.yml`). 
+6. Verify that `SCOPE_HOME` contains the AppScope library (`libscope.so`) and the config file (`scope.yml`). 
    ```
    ubuntu@my_hostname:~/someuser/temp$ ls -al $SCOPE_HOME
    total 20528
    drwxr-xr-x 2 root root     4096 Jul 11 22:51 .
    drwxr-xr-x 5 root root     4096 Jul 11 22:51 ..
-   -rwxr-xr-x 1 root root 11308832 Jul 11 22:51 ldscope
    -rwxr-xr-x 1 root root  9663240 Jul 11 22:51 libscope.so
    -rw-r--r-- 1 root root    35755 Jul 11 22:51 scope.yml
    ubuntu@my_hostname:~/someuser/temp$ 
@@ -41,13 +40,7 @@ How the library is loaded depends on the type of executable. A dynamic loader ca
 
 <span id="env-vars"> </span>
 
-### Env Vars and the Config File
-
-To see the full set of library environment variables, run the following command:
-
-```
-/opt/appscope/ldscope --help | egrep "^[[:space:]]{8}SCOPE_"
-```
+### The Config File
 
 For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 
@@ -66,7 +59,7 @@ To use the library directly, you rely on the `LD_PRELOAD` environment variable.
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
 
-For more, check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
+For more, check out the [Further Examples](/docs/examples-use-cases), which include both CLI and library use cases.
 
 #### `LD_PRELOAD` with a Single Command
 
@@ -86,7 +79,7 @@ Details of the `ps` application's execution are emitted to the configured transp
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 ```
 
-This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
+This again executes the `ps` command using the AppScope library. But it also defines the [verbosity](/docs/events-and-metrics#metrics) for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
 #### `LD_PRELOAD` with a Config File
 
@@ -139,7 +132,10 @@ Assuming that you have [created](https://aws.amazon.com/lambda/getting-started/)
 
 #### Adding an AppScope AWS Lambda Layer
 
-1. Start with one of the AWS Lambda Layers for AppScope that Cribl provides. You can obtain the AWS Lambda Layers and their MD5 checksums from the Cribl CDN, or via Docker. See the Cribl [downloads page](https://cribl.io/download/#tab-1). 
+1. Start with one of the AWS Lambda Layers for AppScope that Cribl provides. You can obtain the AWS Lambda Layers and their MD5 checksums from the Cribl CDN.
+    - `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip)
+    - `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip)
+    - To obtain the MD5 checksum for either file above, add `.md5` to the file path.
 2. Complete the procedure for creating a layer described in the [AWS docs](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-create), uploading your AppScope AWS Lambda Layer ZIP file in the **upload your layer code** step, and choosing `x86_64` or `ARM64`, as appropriate, for **Compatible architectures**.
 3. After you click **Create**, note the **Version ARN** shown for your newly-created layer.
 4. Navigate to **Lambda** > **Layers** > **Add layer**, and in the **Choose a layer** section, select **Specify an ARN**. 
@@ -155,9 +151,9 @@ The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuratio
 
 2. `SCOPE_EXEC_PATH` is required for static executables (like the Go runtime).
 
-    - `SCOPE_EXEC_PATH=/lib/ldscope`
+    - `SCOPE_EXEC_PATH=/opt/appscope/scope`
 
-3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](data-routing).
+3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](/docs/data-routing).
 
     - For example, `SCOPE_CRIBL_CLOUD` is required for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream. (Substitute your host and port values for the placeholders.)
 

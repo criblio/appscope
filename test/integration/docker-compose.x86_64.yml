@@ -109,26 +109,13 @@ services:
       args:
         GO_IMAGE_VER: golang:1.7
     <<: *scope-common
-  # golang:1.8 is available for arm64 but some Debian dependencies aren't
   go_8:
     image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.8
-    <<: *scope-common
-
-  # the rest of the Go tests are skipped on ARM until we add support in scope
-  go_8:
-    image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.8
     <<: *scope-common
@@ -138,7 +125,7 @@ services:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_9:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.9
     <<: *scope-common
@@ -148,7 +135,7 @@ services:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_10:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.10
     <<: *scope-common
@@ -350,7 +337,7 @@ services:
     <<: *scope-common
   oracle-java9:
     environment:
-        SKIP_LDSCOPE_TEST: 'true'
+        SKIP_SCOPE_TEST: 'true'
     image: ghcr.io/criblio/appscope-test-oracle-java9:${TAG:?Missing TAG environment variable}
     build:
       cache_from:

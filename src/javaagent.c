@@ -25,6 +25,7 @@ typedef struct {
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
     jmethodID mid_ByteBuffer_hasArray;
+    jmethodID mid_ByteBuffer_isDirect;
     jfieldID  fid_ByteBuffer___fd;
 #if SSL > 0
     jmethodID mid_SSLEngineImpl___wrap;
@@ -232,6 +233,7 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
     g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
     g_java.mid_ByteBuffer_hasArray = (*jni)->GetMethodID(jni, byteBufferClass, "hasArray", "()Z");
+    g_java.mid_ByteBuffer_isDirect = (*jni)->GetMethodID(jni, byteBufferClass, "isDirect", "()Z");
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
@@ -400,8 +402,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 }
 
-static void 
-doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd)
+static void
+doJavaProtocolByteArray(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd)
 {
     if (!jni || !session || !buf) return;
 
@@ -409,8 +411,25 @@ doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint l
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
     if (!byteBuf) return;
     doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF);
-    //scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocol");
+    //scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocolByteArray");
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, byteBuf, 0);
+}
+
+static void
+doJavaProtocolBufferAddr(JNIEnv *jni, jobject session, void *buf, jint offset, jint len, metric_t src, int fd, jlong bufCap)
+{
+    if (!jni || !session || !buf) return;
+
+    jint  hash    = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
+    char *byteBuf = scope_malloc(bufCap);
+    if (!byteBuf) {
+        return;
+    }
+
+    scope_memcpy(byteBuf, buf, bufCap);
+    doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF);
+    //scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocolBufferAddr");
+    scope_free(byteBuf);
 }
 
 static void
@@ -465,6 +484,13 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
+        clearJniException(jni);
+        return res;
+    }
+
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
@@ -513,13 +539,16 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
          */
         if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
             buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        } else {
-            // Do we need to test for a direct array here? Seems to work as is.
+            if (clearJniException(jni) || !buf) return res;
+            doJavaProtocolByteArray(jni, session, buf, 0, pos, TLSRX, fd);
+        } else if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_isDirect) == TRUE) {
             buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
+            if (clearJniException(jni) || !buf) return res;
+
+            jlong bufCap = (*jni)->GetDirectBufferCapacity(jni, bufEl);
+            doJavaProtocolBufferAddr(jni, session, buf, 0, pos, TLSRX, fd, bufCap);
         }
 
-        if (clearJniException(jni) || !buf) return res;
-        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
     }
 
     clearJniException(jni);
@@ -540,6 +569,13 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
+
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
+        clearJniException(jni);
+        return res;
+    }
 
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
@@ -584,12 +620,15 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
          */
         if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
             buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        } else {
+            if (clearJniException(jni) || !buf) return res;
+            doJavaProtocolByteArray(jni, session, buf, pos, limit, TLSTX, fd);
+        } else if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_isDirect) == TRUE) {
             buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
-        }
+            if (clearJniException(jni) || !buf) return res;
 
-        if (clearJniException(jni) || !buf) return res;
-        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
+            jlong bufCap = (*jni)->GetDirectBufferCapacity(jni, bufEl);
+            doJavaProtocolBufferAddr(jni, session, buf, pos, limit, TLSTX, fd, bufCap);
+        }
     }
 
     clearJniException(jni);
@@ -611,6 +650,13 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     initJniGlobals(jni);
     initAppOutputStreamGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
+        clearJniException(jni);
+        return;
+    }
+
     jobject session;
     if (g_java.fid_AppOutputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
@@ -626,7 +672,7 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
     if (preexisting_exception || (*jni)->ExceptionCheck(jni)) return;
 
-    doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
+    doJavaProtocolByteArray(jni, session, buf, offset, len, TLSTX, fd);
     clearJniException(jni);
 }
 
@@ -654,6 +700,13 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     initJniGlobals(jni);
     initAppInputStreamGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
+        clearJniException(jni);
+        return res;
+    }
+
     jobject session;
     if (g_java.fid_AppInputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppInputStream_socket);
@@ -669,7 +722,7 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
     if (preexisting_exception || (*jni)->ExceptionCheck(jni) || (res < 0)) return res;
 
-    doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
+    doJavaProtocolByteArray(jni, session, buf, offset, res, TLSRX, fd);
     clearJniException(jni);
     return res;
 }
@@ -702,7 +755,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
 
     jvmtiCapabilities capabilities;
-    memset(&capabilities,0, sizeof(capabilities));
+    scope_memset(&capabilities,0, sizeof(capabilities));
 
     capabilities.can_generate_all_class_hook_events = 1;
     error = (*env)->AddCapabilities(env, &capabilities);
@@ -718,7 +771,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
    
     jvmtiEventCallbacks callbacks;
-    memset(&callbacks, 0, sizeof(callbacks));
+    scope_memset(&callbacks, 0, sizeof(callbacks));
     callbacks.ClassFileLoadHook = &ClassFileLoadHook;
     error = (*env)->SetEventCallbacks(env, &callbacks, sizeof(callbacks));
     if (error != JVMTI_ERROR_NONE) {

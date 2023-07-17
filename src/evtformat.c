@@ -570,10 +570,12 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t *
     // add one that's already in the set, skip it.  In this way precedence
     // is given to capturedFields then custom fields then remaining fields.
     addedFields = strSetCreate(DEFAULT_SET_SIZE);
-    if (!addJsonFields(metric->capturedFields, fieldFilter, json, addedFields)) goto err;
-    addCustomJsonFields(tags, json, addedFields);
-    if (!addJsonFields(metric->fields, fieldFilter, json, addedFields)) goto err;
-    strSetDestroy(&addedFields);
+    if (addedFields) {
+        if (!addJsonFields(metric->capturedFields, fieldFilter, json, addedFields)) goto err;
+        addCustomJsonFields(tags, json, addedFields);
+        if (!addJsonFields(metric->fields, fieldFilter, json, addedFields)) goto err;
+        strSetDestroy(&addedFields);
+    }
 
     return json;
 

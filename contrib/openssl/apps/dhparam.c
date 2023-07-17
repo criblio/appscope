@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -181,7 +181,11 @@ int dhparam_main(int argc, char **argv)
     if (num) {
         const char *alg = dsaparam ? "DSA" : "DH";
 
-        ctx = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
+        if (infile != NULL) {
+            BIO_printf(bio_err, "Warning, input file %s ignored\n", infile);
+        }
+
+        ctx = EVP_PKEY_CTX_new_from_name(app_get0_libctx(), alg, app_get0_propq());
         if (ctx == NULL) {
             BIO_printf(bio_err,
                         "Error, %s param generation context allocation failed\n",
@@ -194,7 +198,7 @@ int dhparam_main(int argc, char **argv)
                     "Generating %s parameters, %d bit long %sprime\n",
                     alg, num, dsaparam ? "" : "safe ");
 
-        if (!EVP_PKEY_paramgen_init(ctx)) {
+        if (EVP_PKEY_paramgen_init(ctx) <= 0) {
             BIO_printf(bio_err,
                         "Error, unable to initialise %s parameters\n",
                         alg);
@@ -202,26 +206,22 @@ int dhparam_main(int argc, char **argv)
         }
 
         if (dsaparam) {
-            if (!EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, num)) {
+            if (EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, num) <= 0) {
                 BIO_printf(bio_err, "Error, unable to set DSA prime length\n");
                 goto end;
             }
         } else {
-            if (!EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, num)) {
+            if (EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, num) <= 0) {
                 BIO_printf(bio_err, "Error, unable to set DH prime length\n");
                 goto end;
             }
-            if (!EVP_PKEY_CTX_set_dh_paramgen_generator(ctx, g)) {
+            if (EVP_PKEY_CTX_set_dh_paramgen_generator(ctx, g) <= 0) {
                 BIO_printf(bio_err, "Error, unable to set generator\n");
                 goto end;
             }
         }
 
-        if (!EVP_PKEY_paramgen(ctx, &tmppkey)) {
-            BIO_printf(bio_err, "Error, %s generation failed\n", alg);
-            goto end;
-        }
-
+        tmppkey = app_paramgen(ctx, alg);
         EVP_PKEY_CTX_free(ctx);
         ctx = NULL;
         if (dsaparam) {
@@ -277,10 +277,9 @@ int dhparam_main(int argc, char **argv)
                 */
                 keytype = "DHX";
                 /*
-                    * BIO_reset() returns 0 for success for file BIOs only!!!
-                    * This won't work for stdin (and never has done)
-                    * TODO: We should fix this at some point
-                    */
+                 * BIO_reset() returns 0 for success for file BIOs only!!!
+                 * This won't work for stdin (and never has done)
+                 */
                 if (BIO_reset(in) == 0)
                     done = 0;
             }
@@ -314,12 +313,12 @@ int dhparam_main(int argc, char **argv)
         EVP_PKEY_print_params(out, pkey, 4, NULL);
 
     if (check) {
-        ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, NULL);
+        ctx = EVP_PKEY_CTX_new_from_pkey(app_get0_libctx(), pkey, app_get0_propq());
         if (ctx == NULL) {
             BIO_printf(bio_err, "Error, failed to check DH parameters\n");
             goto end;
         }
-        if (!EVP_PKEY_param_check(ctx)) {
+        if (EVP_PKEY_param_check(ctx) <= 0) {
             BIO_printf(bio_err, "Error, invalid parameters generated\n");
             goto end;
         }
@@ -386,10 +385,10 @@ static EVP_PKEY *dsa_to_dh(EVP_PKEY *dh)
         goto err;
     }
 
-    ctx = EVP_PKEY_CTX_new_from_name(NULL, "DHX", NULL);
+    ctx = EVP_PKEY_CTX_new_from_name(app_get0_libctx(), "DHX", app_get0_propq());
     if (ctx == NULL
-            || !EVP_PKEY_fromdata_init(ctx)
-            || !EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEY_PARAMETERS, params)) {
+            || EVP_PKEY_fromdata_init(ctx) <= 0
+            || EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEY_PARAMETERS, params) <= 0) {
         BIO_printf(bio_err, "Error, failed to set DH parameters\n");
         goto err;
     }

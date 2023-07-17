@@ -1,13 +1,13 @@
 #define _GNU_SOURCE
 #include <string.h>
 
+#include "atomic.h"
 #include "com.h"
 #include "dbg.h"
 #include "os.h"
 #include "utils.h"
 #include "scopestdlib.h"
 
-bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
 bool g_exitdone = FALSE;
 
@@ -173,8 +173,10 @@ jsonProcessObject(proc_id_t *proc)
         if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
     }
     if (!(cJSON_AddStringToObjLN(root, "id", proc->id))) goto err;
-    // starttime
-
+    if (!(cJSON_AddStringToObjLN(root, "cgroup", proc->cgroup))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "machine_id", proc->machine_id))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "uuid", proc->uuid))) goto err;
+ 
     return root;
 err:
     if (root) cJSON_Delete(root);
@@ -203,9 +205,20 @@ err:
 static cJSON *
 jsonEnvironmentObject()
 {
-    return cJSON_CreateObject();
-    // config file???
-    // env variables???
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    char *env_cribl_k8s_pod = fullGetEnv("CRIBL_K8S_POD");
+    if (env_cribl_k8s_pod) {
+        if (!cJSON_AddStringToObjLN(root, "CRIBL_K8S_POD",
+                                        env_cribl_k8s_pod)) goto err;
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
 }
 
 void
@@ -273,96 +286,220 @@ msgEventGet(ctl_t *ctl)
     return ctlGetEvent(ctl);
 }
 
+// We saw a performance issue with malloc/free of memory
+// used for stacks in pcre2_match_wrapper and regexec_wrapper.
+// Every malloc was an mmap, every free an unmmap (both syscalls).
+//
+// To address this, have a lazily-allocated pool of stacks.
+// Once allocated, never free stacks in this pool, instead just
+// keep track of whether each stack is available for reuse.
+
+// Why 48? Primarily to support 48 concurrent threads,
+// but also to provide some slop. Slop for the unlikely case
+// where a thread is killed asynchronously while the stack
+// is marked as used.  When this happens we'll lose the
+// ability to reuse that stack for the life of this process.
+
+#define POOL_MAX 48
+typedef struct {
+    uint64_t used;
+    char *addr;
+} pool_t;
+
+static pool_t g_stack_pool[POOL_MAX] = {0};
+
+static bool
+grab_unused(pool_t *entry)
+{
+    // Done atomically so two concurrent threads will never try
+    // to use a stack at one time.
+    return atomicCasU64(&entry->used, (uint64_t)FALSE, (uint64_t)TRUE);
+}
+
+static char *
+get_stack(void)
+{
+    int i;
+    for (i=0; i<POOL_MAX; i++) {
+        pool_t *entry = &g_stack_pool[i];
+
+        if (!entry->used && grab_unused(entry)) {
+
+            // Sweet!  Our thread grabbed an allocated spot!
+            if (entry->addr) return entry->addr;
+
+            // We have a spot, but we need to allocate a stack here.
+            entry->addr = scope_malloc(PCRE_STACK_SIZE);
+            if (entry->addr) return entry->addr;
+
+            // We got a spot, but our malloc failed. Put the spot back
+            // into the unused pool. Stop looping if this happens.
+            if (!atomicCasU64(&entry->used, (uint64_t)TRUE, (uint64_t)FALSE)) {
+                 scopeLogError("get_stack failed to set used to FALSE");
+            }
+            break;
+        }
+    }
+
+    // Our attempt to use the pool failed.
+    // All pool entries were probably in use.
+    // As a fall-back, do an allocation that's not from the pool
+    return scope_malloc(PCRE_STACK_SIZE);
+}
+
+static void
+free_stack(char *addr)
+{
+    int i;
+    for (i=0; i<POOL_MAX; i++) {
+        pool_t *entry = &g_stack_pool[i];
+
+        if (entry->addr == addr) {
+
+            // Addr is in the pool. Don't free addr, but set used to false
+            // to allow reuse.
+            if (!atomicCasU64(&entry->used, (uint64_t)TRUE, (uint64_t)FALSE)) {
+                 scopeLogError("free_stack failed to set used to FALSE");
+            }
+            return;
+        }
+    }
+
+    // We didn't find this addr in the pool.
+    // It must not be from the pool.  Free it.
+    scope_free(addr);
+}
+
+
 int
 pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     PCRE2_SIZE startoffset, uint32_t options,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
-
-    if (g_need_stack_expand == FALSE) {
-        return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
-    }
-
-#ifdef __GO__
-    int rc, arc;
-    char *pcre_stack, *tstack, *gstack;
-    if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLogError("ERROR; pcre2_match_wrapper: scope_malloc");
+    int rc;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
+    if ((pcre_stack = get_stack()) == NULL) {
+        scopeLogError("ERROR; pcre2_match_wrapper: get_stack");
         return -1;
     }
 
     tstack = pcre_stack + PCRE_STACK_SIZE;
 
     // save the original stack, switch to the tstack
+#if defined (__x86_64__)
+    int arc;
+
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
+        : "=r"(arc)                     // output
+        : "m"(tstack), "m"(gstack)      // input
+        :                               // clobbered register
         );
 
     rc = pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
 
-    // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(arc)                       // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );
+#elif defined (__aarch64__)
+    __asm__ volatile (
+        "ldr  x0, %3 \n"                 // get params from the stack before switching
+        "ldr  x1, %4 \n"
+        "ldr  x2, %5 \n"
+        "ldr  x3, %6 \n"
+        "ldr  w4, %7 \n"
+        "ldr  x5, %8 \n"
+        "ldr  x6, %9 \n"
+        "mov  x14, sp \n"
+        "str  x14, %2 \n"
+        "ldr  x15, %1 \n"
+        "mov  sp, x15 \n"                // increase stack size
 
-    if (pcre_stack) scope_free(pcre_stack);
-    return rc;
+        "str  x14, [sp, #-16]! \n"
+
+        // Note: the symbol name below may need to change if the pcre2 lib is updated
+        "bl   pcre2_match_8 \n"          // call the regexec function
+        "ldr x15, [sp, #0] \n"
+        "mov  sp, x15 \n"
+        "str  w0, %0 \n"                 // save the return value
+        : "=&m"(rc)                      // output
+        : "m"(tstack), "m"(gstack), "m" (re), "m" (data),"m" (size), "m" (startoffset), "m" (options), "m" (match_data), "m" (mcontext)
+        :                               // clobbered register
+        );
 #else
-    return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
+   #error Bad arch defined
 #endif
 
+    if (pcre_stack) free_stack(pcre_stack);
+    return rc;
 }
 
 int
 regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
-   if (g_need_stack_expand == FALSE) {
-        return regexec(preg, string, nmatch, pmatch, eflags);
-    }
-
-#ifdef __GO__
-    int rc, arc;
+    int rc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
-     if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLogError("ERROR; regexec_wrapper: scope_malloc");
+     if ((pcre_stack = get_stack()) == NULL) {
+        scopeLogError("ERROR; regexec_wrapper: get_stack");
         return -1;
     }
 
     tstack = pcre_stack + PCRE_STACK_SIZE;
 
     // save the original stack, switch to the tstack
+#if defined (__x86_64__)
+    int arc;
+
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(arc)                   // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
+        : "=r"(arc)                     // output
+        : "m"(tstack), "m"(gstack)      // input
+        :                               // clobbered register
         );
 
     rc = regexec(preg, string, nmatch, pmatch, eflags);
 
-    // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
-        : "=r"(arc)                        // output
+        : "=r"(arc)                       // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );
+#elif defined (__aarch64__)
+    __asm__ volatile (
+        "ldr  x0, %3 \n"                 // get params from the stack before switching
+        "ldr  x1, %4 \n"
+        "ldr  x2, %5 \n"
+        "ldr  x3, %6 \n"
+        "ldr  w4, %7 \n"
+        "mov  x14, sp \n"
+        "str  x14, %2 \n"
+        "ldr  x15, %1 \n"
+        "mov  sp, x15 \n"                // increase stack size
 
-    if (pcre_stack) scope_free(pcre_stack);
-    return rc;
+        "str  x14, [sp, #-16]! \n"
+
+        "bl   pcre2_regexec \n"          // call the regexec function
+        "ldr x15, [sp, #0] \n"
+        "mov  sp, x15 \n"
+        "str  w0, %0 \n"                 // save the return value
+        : "=&m"(rc)                      // output
+        : "m"(tstack), "m"(gstack), "m" (preg), "m" (string),"m" (nmatch), "m" (pmatch), "m" (eflags)
+        :                               // clobbered register
+        );
 #else
-    return regexec(preg, string, nmatch, pmatch, eflags);
+   #error Bad arch defined
 #endif
+
+    if (pcre_stack) free_stack(pcre_stack);
+    return rc;
 }
 
 bool

@@ -30,9 +30,15 @@ typedef enum {
 
 typedef enum {
     NO_ACTION,
-    URL_REDIRECT_ON,
-    URL_REDIRECT_OFF
+    FUNC_DETACH,
+    FUNC_ATTACH,
 } switch_action_t;
+
+typedef enum {
+    PAYLOAD_STATUS_DISABLE = 0,    // payloads are disabled
+    PAYLOAD_STATUS_CRIBL = 1,      // payloads are enabled and will go to cribl
+    PAYLOAD_STATUS_DISK = 2,       // payloads are enabled and will go on disk
+} payload_status_t;
 
 /**
  * Protocol Detection Data
@@ -113,33 +119,33 @@ int     ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendLog(ctl_t *, int, const char *, const void *, size_t, uint64_t, proc_id_t *);
 void    ctlStopAggregating(ctl_t *);
+bool    ctlProcessAllQueuedEventsNow(ctl_t *);
 void    ctlFlush(ctl_t *);
 int     ctlPostEvent(ctl_t *, char *);
 
 // Connection oriented stuff
-int              ctlNeedsConnection(ctl_t *, which_transport_t);
-int              ctlConnection(ctl_t *, which_transport_t);
-int              ctlConnect(ctl_t *, which_transport_t);
-uint64_t         ctlConnectAttempts(ctl_t *, which_transport_t);
-int              ctlDisconnect(ctl_t *, which_transport_t);
-int              ctlReconnect(ctl_t *, which_transport_t);
-net_fail_t       ctlTransportFailureReason(ctl_t *, which_transport_t);
-void             ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
-cfg_transport_t  ctlTransportType(ctl_t *, which_transport_t);
-transport_t *    ctlTransport(ctl_t *, which_transport_t);
-evt_fmt_t *      ctlEvtGet(ctl_t *);
-void             ctlEvtSet(ctl_t *, evt_fmt_t *);
+int                 ctlNeedsConnection(ctl_t *, which_transport_t);
+int                 ctlConnection(ctl_t *, which_transport_t);
+int                 ctlConnect(ctl_t *, which_transport_t);
+int                 ctlDisconnect(ctl_t *, which_transport_t);
+int                 ctlReconnect(ctl_t *, which_transport_t);
+void                ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
+cfg_transport_t     ctlTransportType(ctl_t *, which_transport_t);
+transport_t *       ctlTransport(ctl_t *, which_transport_t);
+evt_fmt_t *         ctlEvtGet(ctl_t *);
+void                ctlEvtSet(ctl_t *, evt_fmt_t *);
+transport_status_t  ctlConnectionStatus(ctl_t *, which_transport_t);
 
 // Accessor for performance
 bool            ctlEvtSourceEnabled(ctl_t *, watch_t);
 
-unsigned        ctlEnhanceFs(ctl_t *);
-void            ctlEnhanceFsSet(ctl_t *, unsigned);
-unsigned int    ctlPayEnable(ctl_t *);
-void            ctlPayEnableSet(ctl_t *, unsigned int);
-const char *    ctlPayDir(ctl_t *);
-void            ctlPayDirSet(ctl_t *, const char *);
-void            ctlAllowBinaryConsoleSet(ctl_t *, unsigned);
+unsigned         ctlEnhanceFs(ctl_t *);
+void             ctlEnhanceFsSet(ctl_t *, unsigned);
+payload_status_t ctlPayStatus(ctl_t *);
+void             ctlPayStatusSet(ctl_t *, payload_status_t);
+const char *     ctlPayDir(ctl_t *);
+void             ctlPayDirSet(ctl_t *, const char *);
+void             ctlAllowBinaryConsoleSet(ctl_t *, unsigned);
 
 // Retrieve events
 uint64_t   ctlGetEvent(ctl_t *);

@@ -1,5 +1,4 @@
 #! /bin/bash
-
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 
 FAILED_TEST_LIST=""
@@ -47,6 +46,57 @@ endtest(){
     rm -f $SCOPE_LOG_FILE
 }
 
+# This functions verifies crash files generated for scoped process
+# (backtrace file and info file)
+#
+# Arguments:
+#   $1 - process name
+#   $2 - expected message info in backtrace file
+#
+# Returns:
+#  None
+#
+verifySnapshot() {
+    local fault_pid=`echo $!`
+    local process_name=$1
+    local backtrace_msg=$2
+
+    sleep 1
+    # Emulate CLI behavior
+    kill -s SIGCONT $fault_pid
+    sleep 1
+
+    local snapshot_dir="/tmp/appscope/$fault_pid"
+    local info_file_path="$snapshot_dir/info*"
+    local cfg_file_path="$snapshot_dir/cfg**"
+    local backtrace_file_path="$snapshot_dir/backtrace*"
+
+    # The following preamble is common for all backtrace
+    grep -a "Scope Version:" $info_file_path > /dev/null
+    ERR+=$?
+    grep -a "Unix Time: " $info_file_path > /dev/null
+    ERR+=$?
+    grep -a "PID: " $info_file_path > /dev/null
+    ERR+=$?
+    grep -a "Process name: $process_name" $info_file_path > /dev/null
+    ERR+=$?
+    if [ ! -f $cfg_file_path ]; then
+        ERR+=1
+    fi
+    grep -a -- "--- backtrace" $backtrace_file_path > /dev/null
+    ERR+=$?
+    grep -a "$backtrace_msg" $backtrace_file_path > /dev/null
+    if [ $? != 0 ]; then
+        ERR+=$?
+        echo "verifySnapshot fails, params: $1 $2"
+        cat $info_file_path
+        cat $cfg_file_path
+        cat $backtrace_file_path
+    fi
+    # clean it up
+    rm -rf $snapshot_dir
+}
+
 #
 # extract on glibc
 #
@@ -68,22 +118,17 @@ fi
 endtest
 
 #
-# ldscope patch
+# scope patch
 #
 starttest patch_on_glibc
 
+cp /usr/local/scope/bin/scope /opt/patch_libscope
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
-cp /usr/local/scope/bin/ldscope /opt/patch_libscope
 
 md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
 count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
 if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/libscope.so
-if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
@@ -100,22 +145,12 @@ fi
 
 endtest
 
-starttest patch_on_glibc_dummy_file
-
-echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
-if [ $? -eq 0 ]; then
-    ERR+=1
-fi
-
-endtest
-
 #
 # verify timestamp
 #
 starttest timestamp_verify
 
-SCOPE_LOG_LEVEL=debug ldscope ls >/dev/null
+SCOPE_LOG_LEVEL=debug scope -z ls >/dev/null
 
 timestamp=$(grep 'Constructor' $SCOPE_LOG_FILE | grep -Po "(?<=\[).*?(?=\])")
 if [[ $timestamp =~ [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}(Z|\+[0-9]{4})$ ]]; then
@@ -133,7 +168,7 @@ endtest
 starttest errno_verify
 cd /opt/errno_test/
 
-ldscope ./errno_test
+scope -z ./errno_test
 
 if [ $? -ne 0 ]; then
     ERR+=1
@@ -149,21 +184,9 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+SCOPE_SNAPSHOT_BACKTRACE=true scope -z -- ./fault_test 0 &
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
-if [ "x86_64" = "$(uname -m)" ]; then
-    grep "read_only_area_error" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-
-    grep "test_function" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-fi
-
-grep "Invalid permissions for mapped object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifySnapshot "fault_test" "Invalid permissions for mapped object"
 
 endtest
 
@@ -175,21 +198,9 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+SCOPE_SNAPSHOT_BACKTRACE=true scope -z -- ./fault_test 1 &
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
-if [ "x86_64" = "$(uname -m)" ]; then
-    grep "not_mapped_address_error" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-
-    grep "test_function" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-fi
-
-grep "Address not mapped to object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifySnapshot "fault_test" "Address not mapped to object"
 
 endtest
 
@@ -201,23 +212,122 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+SCOPE_SNAPSHOT_BACKTRACE=true scope -z -- ./fault_test 2 &
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
-if [ "x86_64" = "$(uname -m)" ]; then
-    grep "bus_error" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-
-    grep "test_function" $SCOPE_LOG_FILE > /dev/null
-    ERR+=$?
-fi
-
-grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifySnapshot "fault_test" "Nonexistent physical address"
 
 endtest
+
+#
+# verify division by zero
+#
+
+if [ "x86_64" = "$(uname -m)" ]; then
+
+starttest div_by_zero_error
+
+cd /opt/fault_test/
+
+SCOPE_SNAPSHOT_BACKTRACE=true scope -z ./fault_test 3 &
+
+verifySnapshot "fault_test" "Integer divide by zero"
+
+endtest
+
+fi
+
+#
+# Illegal operand/opcode
+#
+
+starttest illegal_op_error
+
+cd /opt/fault_test/
+
+SCOPE_SNAPSHOT_BACKTRACE=true scope -z ./fault_test 4 &
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    verifySnapshot "fault_test" "Illegal operand"
+else
+    verifySnapshot "fault_test" "Illegal opcode"
+fi
+
+endtest
+
+
+#
+# attach_...
+#   Tests that libscope.so calls the the signal handler of the
+#   test application (./sighandler) after calling libscope.so's handler.
+#   In this attach case, it proves we're able to figure out what test app
+#   handlers to call after the test app has already registered them.
+#
+cd /opt/sig_test
+
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
+do
+  for FUNCTION in signal sigaction
+  do
+    starttest attach_${SIGNAL}_using_${FUNCTION}
+    ./sighandler $FUNCTION > standardout.txt &
+    PID=`echo $!`
+    sleep 1
+    SCOPE_SNAPSHOT_COREDUMP=true scope attach $PID
+    sleep 1
+    kill -s $SIGNAL $PID
+    sleep 10
+    grep "Handling $SIGNAL from ./sighandler" standardout.txt
+    ERR+=$?
+    rm standardout.txt
+    kill $PID
+    endtest
+  done
+done
+
+
+#
+# preloaded_...
+#   Tests that libscope.so calls the the signal handler of the
+#   test application (./sighandler) after calling libscope.so's handler.
+#   In this preloaded case, it proves we're interposing "signal()"
+#   and "sigaction()" correctly.
+#
+cd /opt/sig_test
+
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
+do
+  for FUNCTION in signal sigaction
+  do
+    starttest preloaded_${SIGNAL}_using_${FUNCTION}
+    SCOPE_SNAPSHOT_COREDUMP=true scope run --passthrough -- ./sighandler $FUNCTION > standardout.txt &
+    PID=`echo $!`
+    sleep 1
+    kill -s $SIGNAL $PID
+    sleep 10
+    grep "Handling $SIGNAL from ./sighandler" standardout.txt
+    ERR+=$?
+    rm standardout.txt
+    kill $PID
+    endtest
+  done
+done
+
+# Test SIGUSR2
+for FUNCTION in signal sigaction
+do
+  for TRIGGER in raise timer
+  do
+    starttest preloaded_sigusr2_using_${FUNCTION}_${TRIGGER}
+    scope run --passthrough -- ./sigusrhandler $FUNCTION $TRIGGER > stdout.txt
+    sleep 2
+    grep "Handling SIGUSR2" stdout.txt
+    ERR+=$?
+    grep "dummy_file.txt" $EVT_FILE
+    ERR+=$?
+    rm stdout.txt
+    endtest
+  done
+done
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

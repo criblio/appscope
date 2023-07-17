@@ -131,7 +131,7 @@ func ParseEvent(b []byte) (libscope.EventBody, error) {
 	if event.Type == "evt" {
 		return event.Body, nil
 	}
-	return event.Body, fmt.Errorf("could not find body in event")
+	return event.Body, fmt.Errorf("config event")
 }
 
 // EventMatch helps retrieve events from events.json
@@ -229,7 +229,7 @@ func PrintEvent(in chan libscope.EventBody, jsonOut bool) {
 // PrintEvents prints multiple events
 // handles --eval
 // handles --json
-func PrintEvents(in chan libscope.EventBody, fields []string, sortField, eval string, jsonOut, sortReverse, allFields, forceColor bool, width int) {
+func PrintEvents(in chan libscope.EventBody, fields []string, sortField, eval string, jsonOut, sortReverse, allFields, forceColor bool, width int, follow bool) {
 	enc := json.NewEncoder(os.Stdout)
 	var vm *goja.Runtime
 	var prog *goja.Program
@@ -278,6 +278,12 @@ func PrintEvents(in chan libscope.EventBody, fields []string, sortField, eval st
 		}
 
 		events = append(events, e)
+
+		// No sorting needed for follow mode
+		if follow {
+			out := GetEventText(e, forceColor, allFields, fields, width)
+			util.Printf("%s\n", out)
+		}
 	}
 
 	// Sort events

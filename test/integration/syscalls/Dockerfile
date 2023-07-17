@@ -20,7 +20,7 @@ RUN cd /opt/test && \
       patch -p1 < /opt/test/ltp_p1.patch && \
       make autotools && \
       ./configure && \
-      make -j
+      make -j"$(nproc)"
 
 RUN source scl_source enable rh-python38 && \
     virtualenv -p $(which python) /opt/test-runner/
@@ -35,7 +35,7 @@ ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 
 COPY ./syscalls/altp /opt/test/altp
-RUN cd /opt/test/altp && make -j
+RUN cd /opt/test/altp && make -j"$(nproc)"
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
@@ -53,7 +53,6 @@ RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY ./syscalls/scope-test /usr/local/scope/

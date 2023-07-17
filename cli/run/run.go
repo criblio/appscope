@@ -2,32 +2,35 @@ package run
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
 )
 
 // Config represents options to change how we run scope
 type Config struct {
 	WorkDir       string
-	Passthrough   bool
 	Verbosity     int
 	Payloads      bool
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string
+	MetricsPrefix string
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
+	LogDest       string
 	LibraryPath   string
 	NoBreaker     bool
 	AuthToken     string
 	UserConfig    string
+	CommandDir    string
+	Coredump      bool
+	Backtrace     bool
+	Rootdir       string
 
 	now func() time.Time
 	sc  *libscope.ScopeConfig
@@ -35,40 +38,33 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := createLdscope(); err != nil {
-		util.ErrAndExit("error creating ldscope: %v", err)
-	}
-	// Normal operational, not passthrough, create directory for this run
-	// Directory contains scope.yml which is configured to output to that
-	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+
+	// Disable detection of a scope rules file with this command
+	env = append(env, "SCOPE_RULES=false")
+
+	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
-	if !rc.Passthrough {
-		rc.setupWorkDir(args, false)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
-	}
+
+	// Normal operation, create a directory for this run.
+	// Directory contains scope.yml which is configured to output to that
+	// directory and has a command directory configured in that directory.
+	rc.setupWorkDir(args, false)
+	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+
+	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
-		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
 			util.ErrAndExit("Library Path does not exist: \"%s\"", rc.LibraryPath)
 		}
-		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	if !rc.Subprocess {
-		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
-	}
-	cmd := exec.Command(ldscopePath(), args...)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Run()
-}
 
-// GetScopeConfig returns the ScopeConfig pointer
-func (rc *Config) GetScopeConfig() *libscope.ScopeConfig {
-	return rc.sc
+	ld := loader.New()
+	if !rc.Subprocess {
+		ld.Passthrough(args, env)
+	}
+	ld.PassthroughSubProc(args, env)
 }

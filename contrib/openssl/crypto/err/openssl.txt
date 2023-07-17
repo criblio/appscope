@@ -1,4 +1,4 @@
-# Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 1999-2022 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -181,6 +181,7 @@ BN_R_INVALID_SHIFT:119:invalid shift
 BN_R_NOT_A_SQUARE:111:not a square
 BN_R_NOT_INITIALIZED:107:not initialized
 BN_R_NO_INVERSE:108:no inverse
+BN_R_NO_PRIME_CANDIDATE:121:no prime candidate
 BN_R_NO_SOLUTION:116:no solution
 BN_R_NO_SUITABLE_DIGEST:120:no suitable digest
 BN_R_PRIVATE_KEY_TOO_LARGE:117:private key too large
@@ -225,6 +226,7 @@ CMP_R_FAILURE_OBTAINING_RANDOM:110:failure obtaining random
 CMP_R_FAIL_INFO_OUT_OF_RANGE:129:fail info out of range
 CMP_R_INVALID_ARGS:100:invalid args
 CMP_R_INVALID_OPTION:174:invalid option
+CMP_R_MISSING_CERTID:165:missing certid
 CMP_R_MISSING_KEY_INPUT_FOR_CREATING_PROTECTION:130:\
 	missing key input for creating protection
 CMP_R_MISSING_KEY_USAGE_DIGITALSIGNATURE:142:missing key usage digitalsignature
@@ -268,6 +270,7 @@ CMP_R_UNSUPPORTED_PROTECTION_ALG_DHBASEDMAC:154:\
 CMP_R_VALUE_TOO_LARGE:175:value too large
 CMP_R_VALUE_TOO_SMALL:177:value too small
 CMP_R_WRONG_ALGORITHM_OID:138:wrong algorithm oid
+CMP_R_WRONG_CERTID:189:wrong certid
 CMP_R_WRONG_CERTID_IN_RP:187:wrong certid in rp
 CMP_R_WRONG_PBM_VALUE:155:wrong pbm value
 CMP_R_WRONG_RP_COMPONENT_COUNT:188:wrong rp component count
@@ -432,6 +435,7 @@ CRYPTO_R_ILLEGAL_HEX_DIGIT:102:illegal hex digit
 CRYPTO_R_INSUFFICIENT_DATA_SPACE:106:insufficient data space
 CRYPTO_R_INSUFFICIENT_PARAM_SIZE:107:insufficient param size
 CRYPTO_R_INSUFFICIENT_SECURE_DATA_SPACE:108:insufficient secure data space
+CRYPTO_R_INVALID_NEGATIVE_VALUE:122:invalid negative value
 CRYPTO_R_INVALID_NULL_ARGUMENT:109:invalid null argument
 CRYPTO_R_INVALID_OSSL_PARAM_TYPE:110:invalid ossl param type
 CRYPTO_R_ODD_NUMBER_OF_DIGITS:103:odd number of digits
@@ -534,6 +538,7 @@ EC_R_CURVE_DOES_NOT_SUPPORT_SIGNING:159:curve does not support signing
 EC_R_DECODE_ERROR:142:decode error
 EC_R_DISCRIMINANT_IS_ZERO:118:discriminant is zero
 EC_R_EC_GROUP_NEW_BY_NAME_FAILURE:119:ec group new by name failure
+EC_R_EXPLICIT_PARAMS_NOT_SUPPORTED:127:explicit params not supported
 EC_R_FAILED_MAKING_PUBLIC_KEY:166:failed making public key
 EC_R_FIELD_TOO_LARGE:143:field too large
 EC_R_GF2M_NOT_SUPPORTED:147:gf2m not supported
@@ -555,6 +560,7 @@ EC_R_INVALID_FORM:104:invalid form
 EC_R_INVALID_GENERATOR:173:invalid generator
 EC_R_INVALID_GROUP_ORDER:122:invalid group order
 EC_R_INVALID_KEY:116:invalid key
+EC_R_INVALID_LENGTH:117:invalid length
 EC_R_INVALID_NAMED_GROUP_CONVERSION:174:invalid named group conversion
 EC_R_INVALID_OUTPUT_LENGTH:161:invalid output length
 EC_R_INVALID_P:172:invalid p
@@ -760,6 +766,7 @@ HTTP_R_ERROR_PARSING_URL:101:error parsing url
 HTTP_R_ERROR_RECEIVING:103:error receiving
 HTTP_R_ERROR_SENDING:102:error sending
 HTTP_R_FAILED_READING_DATA:128:failed reading data
+HTTP_R_HEADER_PARSE_ERROR:126:header parse error
 HTTP_R_INCONSISTENT_CONTENT_LENGTH:120:inconsistent content length
 HTTP_R_INVALID_PORT_NUMBER:123:invalid port number
 HTTP_R_INVALID_URL_PATH:125:invalid url path
@@ -774,6 +781,8 @@ HTTP_R_REDIRECTION_FROM_HTTPS_TO_HTTP:112:redirection from https to http
 HTTP_R_REDIRECTION_NOT_ENABLED:116:redirection not enabled
 HTTP_R_RESPONSE_LINE_TOO_LONG:113:response line too long
 HTTP_R_RESPONSE_PARSE_ERROR:104:response parse error
+HTTP_R_RETRY_TIMEOUT:129:retry timeout
+HTTP_R_SERVER_CANCELED_CONNECTION:127:server canceled connection
 HTTP_R_SOCK_NOT_SUPPORTED:122:sock not supported
 HTTP_R_STATUS_CODE_UNSUPPORTED:114:status code unsupported
 HTTP_R_TLS_NOT_ENABLED:107:tls not enabled
@@ -810,6 +819,7 @@ OCSP_R_UNKNOWN_MESSAGE_DIGEST:119:unknown message digest
 OCSP_R_UNKNOWN_NID:120:unknown nid
 OCSP_R_UNSUPPORTED_REQUESTORNAME_TYPE:129:unsupported requestorname type
 OSSL_DECODER_R_COULD_NOT_DECODE_OBJECT:101:could not decode object
+OSSL_DECODER_R_DECODER_NOT_FOUND:102:decoder not found
 OSSL_DECODER_R_MISSING_GET_PARAMS:100:missing get params
 OSSL_ENCODER_R_ENCODER_NOT_FOUND:101:encoder not found
 OSSL_ENCODER_R_INCORRECT_PROPERTY_QUERY:100:incorrect property query
@@ -829,6 +839,7 @@ OSSL_STORE_R_NOT_A_NAME:103:not a name
 OSSL_STORE_R_NOT_A_PRIVATE_KEY:102:not a private key
 OSSL_STORE_R_NOT_A_PUBLIC_KEY:122:not a public key
 OSSL_STORE_R_NOT_PARAMETERS:104:not parameters
+OSSL_STORE_R_NO_LOADERS_FOUND:123:no loaders found
 OSSL_STORE_R_PASSPHRASE_CALLBACK_ERROR:114:passphrase callback error
 OSSL_STORE_R_PATH_MUST_BE_ABSOLUTE:108:path must be absolute
 OSSL_STORE_R_SEARCH_ONLY_SUPPORTED_FOR_DIRECTORIES:119:\
@@ -985,6 +996,7 @@ PROV_R_INVALID_DATA:115:invalid data
 PROV_R_INVALID_DIGEST:122:invalid digest
 PROV_R_INVALID_DIGEST_LENGTH:166:invalid digest length
 PROV_R_INVALID_DIGEST_SIZE:218:invalid digest size
+PROV_R_INVALID_INPUT_LENGTH:230:invalid input length
 PROV_R_INVALID_ITERATION_COUNT:123:invalid iteration count
 PROV_R_INVALID_IV_LENGTH:109:invalid iv length
 PROV_R_INVALID_KEY:158:invalid key
@@ -1077,8 +1089,6 @@ RAND_R_ADDITIONAL_INPUT_TOO_LONG:102:additional input too long
 RAND_R_ALREADY_INSTANTIATED:103:already instantiated
 RAND_R_ARGUMENT_OUT_OF_RANGE:105:argument out of range
 RAND_R_CANNOT_OPEN_FILE:121:Cannot open file
-RAND_R_DERIVATION_FUNCTION_MANDATORY_FOR_FIPS:137:\
-	derivation function mandatory for fips
 RAND_R_DRBG_ALREADY_INITIALIZED:129:drbg already initialized
 RAND_R_DRBG_NOT_INITIALISED:104:drbg not initialised
 RAND_R_ENTROPY_INPUT_TOO_LONG:106:entropy input too long
@@ -1148,6 +1158,7 @@ RSA_R_INVALID_HEADER:137:invalid header
 RSA_R_INVALID_KEYPAIR:171:invalid keypair
 RSA_R_INVALID_KEY_LENGTH:173:invalid key length
 RSA_R_INVALID_LABEL:160:invalid label
+RSA_R_INVALID_LENGTH:181:invalid length
 RSA_R_INVALID_MESSAGE_LENGTH:131:invalid message length
 RSA_R_INVALID_MGF1_MD:156:invalid mgf1 md
 RSA_R_INVALID_MODULUS:174:invalid modulus
@@ -1186,6 +1197,8 @@ RSA_R_PSS_SALTLEN_TOO_SMALL:164:pss saltlen too small
 RSA_R_PUB_EXPONENT_OUT_OF_RANGE:178:pub exponent out of range
 RSA_R_P_NOT_PRIME:128:p not prime
 RSA_R_Q_NOT_PRIME:129:q not prime
+RSA_R_RANDOMNESS_SOURCE_STRENGTH_INSUFFICIENT:180:\
+	randomness source strength insufficient
 RSA_R_RSA_OPERATIONS_NOT_SUPPORTED:130:rsa operations not supported
 RSA_R_SLEN_CHECK_FAILED:136:salt length check failed
 RSA_R_SLEN_RECOVERY_FAILED:135:salt length recovery failed
@@ -1361,6 +1374,7 @@ SSL_R_MISSING_DSA_SIGNING_CERT:165:missing dsa signing cert
 SSL_R_MISSING_ECDSA_SIGNING_CERT:381:missing ecdsa signing cert
 SSL_R_MISSING_FATAL:256:missing fatal
 SSL_R_MISSING_PARAMETERS:290:missing parameters
+SSL_R_MISSING_PSK_KEX_MODES_EXTENSION:310:missing psk kex modes extension
 SSL_R_MISSING_RSA_CERTIFICATE:168:missing rsa certificate
 SSL_R_MISSING_RSA_ENCRYPTING_CERT:169:missing rsa encrypting cert
 SSL_R_MISSING_RSA_SIGNING_CERT:170:missing rsa signing cert

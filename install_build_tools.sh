@@ -211,7 +211,7 @@ fi
 #      cmake version 3.13.5
 #      lcov: LCOV version 1.13
 #      go1.15.5
-#      upx 3.96
+#      upx 4.0.1
 #
 
 PKG_MGR="unknown"
@@ -243,6 +243,26 @@ yum_sudo_install() {
         echo "Installation of sudo successful."
     else
         echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
+
+yum_curl_exists() {
+    if curl --version &>/dev/null; then
+        echo "curl is already installed; doing nothing for curl."
+    else
+        echo "curl is not already installed."
+        return 1
+    fi
+}
+
+yum_curl_install() {
+    echo "Installing curl."
+    yum install curl
+    if [ $? = 0 ]; then
+        echo "Installation of curl successful."
+    else
+        echo "Installation of curl failed."
         FAILED=1
     fi
 }
@@ -397,7 +417,7 @@ yum_go_install() {
     fi
 }
 
-yum_upx_exists() {
+upx_exists() {
     if upx --version &>/dev/null; then
         echo "upx is already installed; doing nothing for upx."
     else
@@ -406,16 +426,13 @@ yum_upx_exists() {
     fi
 }
 
-yum_upx_install() {
-    echo "Installing upx."
-    sudo yum -y install epel-release
-    sudo yum -y install upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
+upx_install() {
+    upxVersion=4.0.1
+    arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) 
+    curl -Ls https://github.com/upx/upx/releases/download/v${upxVersion}/upx-${upxVersion}-${arch}_linux.tar.xz -o - | tar xvJf - -C /tmp
+    cp /tmp/upx-${upxVersion}-${arch}_linux/upx /usr/local/bin/
+    chmod +x /usr/local/bin/upx
+    echo "Installation of upx successful."
 }
 
 
@@ -432,6 +449,7 @@ yum_dump_versions() {
     fi
     yum --version | head -n1 | sed 's/^/      yum /'
     sudo --version | head -n1 | sed 's/^/      /'
+    curl --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     make --version | head -n1 | sed 's/^/      /'
     automake --version | head -n1 | sed 's/^/      /'
@@ -447,6 +465,9 @@ yum_install() {
 
     if ! yum_sudo_exists; then
         yum_sudo_install
+    fi
+    if ! yum_curl_exists; then
+        yum_curl_install
     fi
     if ! yum_autoconf_exists; then
         yum_autoconf_install
@@ -469,8 +490,8 @@ yum_install() {
     if ! yum_go_exists; then
         yum_go_install
     fi
-    if ! yum_upx_exists; then
-        yum_upx_install
+    if ! upx_exists; then
+        upx_install
     fi
 
 
@@ -514,6 +535,26 @@ apt_sudo_install() {
         echo "Installation of sudo successful."
     else
         echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
+
+apt_curl_exists() {
+    if curl --version &>/dev/null; then
+        echo "curl is already installed; doing nothing for curl."
+    else
+        echo "curl is not already installed."
+        return 1
+    fi
+}
+
+apt_curl_install() {
+    echo "Installing curl."
+    apt-get update && apt-get install curl
+    if [ $? = 0 ]; then
+        echo "Installation of curl successful."
+    else
+        echo "Installation of curl failed."
         FAILED=1
     fi
 }
@@ -643,26 +684,6 @@ apt_go_install() {
     fi
 }
 
-apt_upx_exists() {
-    if upx --version &>/dev/null; then
-        echo "upx is already installed; doing nothing for upx."
-    else
-        echo "upx is not already installed."
-        return 1
-    fi
-}
-
-apt_upx_install() {
-    echo "Installing upx."
-    sudo apt-get install -y upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
-}
-
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -672,6 +693,7 @@ apt_dump_versions() {
     fi
     apt-get --version | head -n1 | sed 's/^/      /'
     sudo --version | head -n1 | sed 's/^/      /'
+    curl --version | head -n1 | sed 's/^/      /'
     make --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     libtool --version | head -n1 | sed 's/^/      /'
@@ -686,6 +708,9 @@ apt_install() {
 
     if ! apt_sudo_exists; then
         apt_sudo_install
+    fi
+    if ! apt_curl_exists; then
+        apt_curl_install
     fi
     if ! apt_make_exists; then
         apt_make_install
@@ -705,10 +730,9 @@ apt_install() {
     if ! apt_go_exists; then
         apt_go_install
     fi
-    if ! apt_upx_exists; then
-        apt_upx_install
+    if ! upx_exists; then
+        upx_install
     fi
-
 
     if (( FAILED )); then
         echo "Installation failure detected."

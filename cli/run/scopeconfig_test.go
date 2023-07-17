@@ -59,15 +59,17 @@ func TestSetDefault(t *testing.T) {
 }
 
 func TestConfigFromRunOpts(t *testing.T) {
+	cwd, _ := os.Getwd()
+	cwd += "/"
 	c := Config{WorkDir: ".foo"}
 	err := c.configFromRunOpts()
 
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, ".foo/metrics.json", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+".foo/metrics.json", c.sc.Metric.Transport.Path)
 	assert.Equal(t, 4, c.sc.Metric.Format.Verbosity)
 	assert.Equal(t, "file", c.sc.Event.Transport.TransportType)
-	assert.Equal(t, ".foo/events.json", c.sc.Event.Transport.Path)
+	assert.Equal(t, cwd+".foo/events.json", c.sc.Event.Transport.Path)
 
 	c.Verbosity = 5
 	err = c.configFromRunOpts()
@@ -77,7 +79,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	c.Payloads = true
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
-	assert.True(t, c.sc.Payload.Enable)
+	assert.EqualValues(t, "true", c.sc.Payload.Enable)
 	assert.Equal(t, ".foo/payloads", c.sc.Payload.Dir)
 
 	c.MetricsFormat = "foo"
@@ -93,7 +95,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	c.MetricsDest = ""
 	err = c.configFromRunOpts()
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, ".foo/metrics.json", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+".foo/metrics.json", c.sc.Metric.Transport.Path)
 
 	// invalid proto
 	c.MetricsDest = "foo://bar"
@@ -127,12 +129,12 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "foo"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "file:///foo/bar"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
@@ -147,7 +149,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "file://stdout" // stdout is valid
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
@@ -184,9 +186,9 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "1234", c.sc.Metric.Transport.Port)
 	assert.Equal(t, "", c.sc.Metric.Transport.Path)
-	assert.Equal(t, false, c.sc.Metric.Transport.Tls.Enable)
+	assert.EqualValues(t, "false", c.sc.Metric.Transport.Tls.Enable)
 
 	// udp
 	c.MetricsDest = "udp://foo:1234"
@@ -194,9 +196,9 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "udp", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "1234", c.sc.Metric.Transport.Port)
 	assert.Equal(t, "", c.sc.Metric.Transport.Path)
-	assert.Equal(t, false, c.sc.Metric.Transport.Tls.Enable)
+	assert.EqualValues(t, "false", c.sc.Metric.Transport.Tls.Enable)
 
 	// tls
 	c.MetricsDest = "tls://foo:1234"
@@ -204,10 +206,10 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "1234", c.sc.Metric.Transport.Port)
 	assert.Equal(t, "", c.sc.Metric.Transport.Path)
-	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
-	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
+	assert.EqualValues(t, "true", c.sc.Metric.Transport.Tls.Enable)
+	assert.EqualValues(t, "true", c.sc.Metric.Transport.Tls.ValidateServer)
 	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
 
 	// host:port
@@ -216,10 +218,10 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "1234", c.sc.Metric.Transport.Port)
 	assert.Equal(t, "", c.sc.Metric.Transport.Path)
-	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
-	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
+	assert.EqualValues(t, "true", c.sc.Metric.Transport.Tls.Enable)
+	assert.EqualValues(t, "true", c.sc.Metric.Transport.Tls.ValidateServer)
 	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
 
 	c.Loglevel = "foo"

@@ -1,120 +1,169 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strconv"
-	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
 	"github.com/syndtr/gocapability/capability"
 )
 
-// Attach scopes an existing PID
-func (rc *Config) Attach(args []string) {
-	// Validate user has root permissions
-	user, err := user.Current()
-	if err != nil {
-		util.ErrAndExit("Unable to get current user: %v", err)
-	}
-	if user.Uid != "0" {
-		util.ErrAndExit("You must have administrator privileges to attach to a process")
-	}
-	// Validate PTRACE capability
-	c, err := capability.NewPid2(0)
-	if err != nil {
-		util.ErrAndExit("Unable to get linux capabilities for current process: %v", err)
-	}
-	err = c.Load()
-	if err != nil {
-		util.ErrAndExit("Unable to load linux capabilities: %v", err)
-	}
-	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-		util.ErrAndExit("You must have PTRACE capabilities to attach to a process")
-	}
-	// Get PID by name if non-numeric, otherwise validate/use args[0]
-	var pid int
-	if !util.IsNumeric(args[0]) {
-		procs := util.ProcessesByName(args[0])
-		if len(procs) == 1 {
-			pid = procs[0].Pid
-		} else if len(procs) > 1 {
-			fmt.Println("Found multiple processes matching that name...")
-			pid = choosePid(procs)
-		} else {
-			util.ErrAndExit("No process found matching that name")
-		}
-		args[0] = fmt.Sprint(pid)
-	} else {
-		pid, err = strconv.Atoi(args[0])
-		if err != nil {
-			util.ErrAndExit("Invalid PID: %s", err)
-		}
-	}
-	// Check PID exists
-	if !util.PidExists(pid) {
-		util.ErrAndExit("PID does not exist: \"%v\"", pid)
-	}
-	// Check PID is not already being scoped
-	if util.PidScoped(pid) {
-		util.ErrAndExit("Attach failed. This process is already being scoped")
-	}
-	// Create ldscope
-	if err := createLdscope(); err != nil {
-		util.ErrAndExit("error creating ldscope: %v", err)
-	}
-	// Normal operational, not passthrough, create directory for this run
-	// Directory contains scope.yml which is configured to output to that
-	// directory and has a command directory configured in that directory.
+var (
+	errGetLinuxCap       = errors.New("unable to get linux capabilities for current process")
+	errLoadLinuxCap      = errors.New("unable to load linux capabilities for current process")
+	errMissingPtrace     = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingScopedProc = errors.New("no scoped process found matching that name")
+	errNotScoped         = errors.New("detach failed. This process is not being scoped")
+	errLibraryNotExist   = errors.New("library Path does not exist")
+)
+
+// NOTE: The responsibility of this function is to check if its possible to attach
+// and then perform the attach if so
+func (rc *Config) Attach(pid int, setupWorkDir bool) (bool, error) {
 	env := os.Environ()
+	ld := loader.New()
+
+	reattach := false
+
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
+	if err != nil {
+		return false, err
+	}
+	if status == util.Disable || status == util.Setup {
+		if err := util.UserVerifyRootPerm(); err != nil {
+			return false, err
+		}
+		// Validate PTRACE capability
+		c, err := capability.NewPid2(0)
+		if err != nil {
+			return false, errGetLinuxCap
+		}
+
+		if err = c.Load(); err != nil {
+			return false, errLoadLinuxCap
+		}
+
+		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
+			return false, errMissingPtrace
+		}
+	} else {
+		// Reattach because process contains our library
+		reattach = true
+	}
+
+	args := []string{fmt.Sprint(pid)}
+
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
+	// Disable detection of a scope rules file with this command
+	env = append(env, "SCOPE_RULES=false")
+
+	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
-	if !rc.Passthrough {
+
+	// Normal operational, create a directory for this run.
+	// Directory contains scope.yml which is configured to output to that
+	// directory and has a command directory configured in that directory.
+	if setupWorkDir {
 		rc.setupWorkDir(args, true)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	}
+	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+
+	// Check the attached process mnt namespace.
+	// If it is different from the CLI mnt namespace:
+	// - create working directory in the attached process mnt namespace
+	// - replace the working directory in the CLI mnt namespace with symbolic
+	//   link to working directory created in previous step
+	refNsPid := util.PidGetRefPidForMntNamespace(rc.Rootdir, pid)
+	if refNsPid != -1 {
+		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
+	}
+
+	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
-		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
-			util.ErrAndExit("Library Path does not exist: \"%s\"", rc.LibraryPath)
+			return reattach, errLibraryNotExist
 		}
-		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	// Prepend "--attach" to args
-	args = append([]string{"--attach"}, args...)
-	if !rc.Subprocess {
-		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+
+	if reattach {
+		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
-	cmd := exec.Command(ldscopePath(), args...)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Run()
+
+	stdoutStderr, err := ld.AttachSubProc(args, env)
+	util.Warn(stdoutStderr)
+	if err != nil {
+		return reattach, err
+	}
+
+	// Replace the working directory files with symbolic links in case of successful attach
+	// where the target ns is different to the origin ns
+
+	if setupWorkDir {
+		eventsFilePath := filepath.Join(rc.WorkDir, "events.json")
+		metricsFilePath := filepath.Join(rc.WorkDir, "metrics.json")
+		logsFilePath := filepath.Join(rc.WorkDir, "libscope.log")
+		payloadsDirPath := filepath.Join(rc.WorkDir, "payloads")
+
+		if rc.Rootdir != "" {
+			os.Remove(eventsFilePath)
+			os.Remove(metricsFilePath)
+			os.Remove(logsFilePath)
+			os.RemoveAll(payloadsDirPath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", eventsFilePath), eventsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", metricsFilePath), metricsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", logsFilePath), logsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", payloadsDirPath), payloadsDirPath)
+
+		} else if refNsPid != -1 {
+			// Child namespace
+			os.Remove(eventsFilePath)
+			os.Remove(metricsFilePath)
+			os.Remove(logsFilePath)
+			os.RemoveAll(payloadsDirPath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", eventsFilePath), eventsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", metricsFilePath), metricsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", logsFilePath), logsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
+		}
+	}
+
+	return reattach, nil
 }
 
-// choosePid presents a user interface for selecting a PID
-func choosePid(procs util.Processes) int {
-	util.PrintObj([]util.ObjField{
-		{Name: "ID", Field: "id"},
-		{Name: "Pid", Field: "pid"},
-		{Name: "User", Field: "user"},
-		{Name: "Scoped", Field: "scoped"},
-		{Name: "Command", Field: "command"},
-	}, procs)
-	fmt.Println("Select an ID from the list:")
-	var selection string
-	fmt.Scanln(&selection)
-	i, err := strconv.Atoi(selection)
-	i--
-	if err != nil || i < 0 || i > len(procs) {
-		util.ErrAndExit("Invalid Selection")
+// NOTE: The responsibility of this function is to check if its possible to detach
+// and then perform the detach if so
+func (rc *Config) Detach(pid int) error {
+	env := os.Environ()
+	ld := loader.New()
+
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
+	if err != nil {
+		return err
 	}
-	return procs[i].Pid
+	if status != util.Active {
+		return errNotScoped
+	}
+
+	args := []string{fmt.Sprint(pid)}
+
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
+	stdoutStderr, err := ld.DetachSubProc(args, env)
+	util.Warn(stdoutStderr)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

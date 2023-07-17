@@ -1,4 +1,4 @@
-FROM hashicorp/terraform:1.1.9
+FROM hashicorp/terraform:1.3.0
 
 RUN apk add bash
 
@@ -27,7 +27,6 @@ RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/lib && \
      mkdir -p /opt/test-runner/logs/ && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY terraform/scope-test /usr/local/scope/scope-test

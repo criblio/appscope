@@ -1,0 +1,21 @@
+{
+	"process":	{
+		"env":[
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		 ]
+	},
+	"mounts":[
+		{
+		   "destination":"/proc",
+		   "type":"proc",
+		   "source":"proc",
+		   "options":[
+			  "nosuid",
+			  "noexec",
+			  "nodev"
+		   ]
+		}
+	],
+	"hooks":{
+	 }
+}

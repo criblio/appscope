@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -21,6 +21,8 @@
 #define END_OF_EARLY_DATA_MAX_LENGTH    0
 #define HELLO_RETRY_REQUEST_MAX_LENGTH  20000
 #define ENCRYPTED_EXTENSIONS_MAX_LENGTH 20000
+#define SESSION_TICKET_MAX_LENGTH_TLS13 131338
+#define SESSION_TICKET_MAX_LENGTH_TLS12 65541
 #define SERVER_KEY_EXCH_MAX_LENGTH      102400
 #define SERVER_HELLO_DONE_MAX_LENGTH    0
 #define KEY_UPDATE_MAX_LENGTH           1
@@ -34,6 +36,11 @@
 
 /* Dummy message type */
 #define SSL3_MT_DUMMY   -1
+
+/* Invalid extension ID for non-supported extensions */
+#define TLSEXT_TYPE_invalid            0x10000
+#define TLSEXT_TYPE_out_of_range       0x10001
+unsigned int ossl_get_extension_type(size_t idx);
 
 extern const unsigned char hrrrandom[];
 

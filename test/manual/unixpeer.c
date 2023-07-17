@@ -1,7 +1,7 @@
 /* 
  * unixpeer.c 
  *
- * gcc -g -Wall test/manual/unixpeer.c -lpthread -o test/linux/unixpeer
+ * gcc -g -Wall test/manual/unixpeer.c -lpthread -o test/linux/unixpeertest
  *
  * Create a UNIX socket between 2 procs; client & server
  * Send data over the socket

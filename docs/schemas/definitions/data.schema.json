@@ -64,8 +64,20 @@
     },
     "commanddir": {
       "title": "commanddir",
-      "description": "The directory in which the command that launched the scoped app was run.",
+      "description": "The directory AppScope polls for a `scope.<pid>` file, as explained in the Dynamic Configuration section of the Using the CLI page of the AppScope docs.",
       "type": "string"
+    },
+    "coredump": {
+      "title": "coredump",
+      "description": "When true, AppScope captures a core dump whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "backtrace": {
+      "title": "backtrace",
+      "description": "When true, AppScope captures a backtrace (a.k.a. stack trace) whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
+      "type": "string",
+      "enum": ["true", "false"]
     },
     "data": {
       "title": "data",
@@ -293,6 +305,16 @@
       "description": "Specifies log level. See `scope.yml`.",
       "type": "string",
       "enum": ["debug", "info", "warning", "error", "none"]
+    },
+    "cgroup" : {
+      "title": "cgroup",
+      "description": "The cgroup for the process.",
+      "type": "string",
+    },
+    "machine_id" : {
+      "title": "machine_id",
+      "description": "A unique identifier for a machine.",
+      "type": "string",
     },
     "maxeventpersec": {
       "title": "maxeventpersec",
@@ -624,6 +646,11 @@
       "description": "Indicates that the metric's value is a number of threads.",
       "type": "string",
       "const": "thread"
+    },
+    "uuid" : {
+      "title": "uuid",
+      "description": "A unique identifier for a process.",
+      "type": "string",
     },
     "validateserver": {
       "title": "validateserver",

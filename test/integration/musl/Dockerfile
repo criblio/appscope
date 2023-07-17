@@ -10,6 +10,10 @@ RUN mkdir -p /opt/fault_test
 COPY ./musl/hello_fault.c /opt/fault_test/hello_fault.c
 RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
 
+RUN mkdir -p /opt/sig_test
+COPY ./musl/sigusrhandler.c /opt/sig_test/sigusrhandler.c
+RUN gcc -g -o /opt/sig_test/sigusrhandler /opt/sig_test/sigusrhandler.c
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 
@@ -24,9 +28,10 @@ ENV SCOPE_EVENT_NET=true
 ENV SCOPE_EVENT_FS=false
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-ENV SCOPE_ALLOW_MUSL_ATTACH=true
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
+
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 
@@ -35,7 +40,6 @@ RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/lib && \
      mkdir -p /opt/test-runner/logs/ && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY musl/scope-test /usr/local/scope/scope-test

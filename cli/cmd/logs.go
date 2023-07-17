@@ -11,11 +11,12 @@ import (
 
 // logsCmd represents the logs command
 var logsCmd = &cobra.Command{
-	Use:     "logs",
-	Short:   "Display scope logs",
-	Long:    `Displays internal AppScope logs for troubleshooting AppScope itself.`,
-	Example: `scope logs`,
-	Args:    cobra.NoArgs,
+	Use:   "logs",
+	Short: "Display scope logs",
+	Long:  `Displays internal AppScope logs for troubleshooting AppScope itself.`,
+	Example: `  scope logs
+  scope logs -s`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
 		lastN, _ := cmd.Flags().GetInt("last")
@@ -30,13 +31,20 @@ var logsCmd = &cobra.Command{
 			if scopeLog {
 				logPath = sessions[0].ScopeLogPath
 			} else {
-				logPath = sessions[0].LdscopeLogPath
+				logPath = sessions[0].LibscopeLogPath
 			}
 		}
 
 		// Open log file
 		logFile, err := os.Open(logPath)
-		util.CheckErrSprintf(err, "%v", err)
+		if err != nil {
+			if scopeLog {
+				fmt.Println("No log file present for the CLI. If you want to see the library logs, try running without -s")
+			} else {
+				fmt.Println("No log file present for the library. If you want to see the CLI logs, try running with -s")
+			}
+			os.Exit(1)
+		}
 
 		offset, err := util.FindReverseLineMatchOffset(lastN, logFile, util.MatchAny())
 		if offset < 0 {
@@ -58,7 +66,7 @@ var logsCmd = &cobra.Command{
 func init() {
 	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID")
 	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines")
-	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of ldscope.log (from library)")
-	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session)")
+	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of libscope.log (from library)")
+	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session")
 	RootCmd.AddCommand(logsCmd)
 }

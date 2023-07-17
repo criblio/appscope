@@ -11,13 +11,14 @@
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/core.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 #include "crypto/bn.h"
 #include "crypto/security_bits.h"
 #include "rsa_local.h"
 
 #define RSA_FIPS1864_MIN_KEYGEN_KEYSIZE 2048
 #define RSA_FIPS1864_MIN_KEYGEN_STRENGTH 112
-#define RSA_FIPS1864_MAX_KEYGEN_STRENGTH 256
 
 /*
  * Generate probable primes 'p' & 'q'. See FIPS 186-4 Section B.3.6
@@ -174,8 +175,7 @@ int ossl_rsa_sp800_56b_validate_strength(int nbits, int strength)
     int s = (int)ossl_ifc_ffc_compute_security_bits(nbits);
 
 #ifdef FIPS_MODULE
-    if (s < RSA_FIPS1864_MIN_KEYGEN_STRENGTH
-            || s > RSA_FIPS1864_MAX_KEYGEN_STRENGTH) {
+    if (s < RSA_FIPS1864_MIN_KEYGEN_STRENGTH) {
         ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
         return 0;
     }
@@ -184,6 +184,28 @@ int ossl_rsa_sp800_56b_validate_strength(int nbits, int strength)
         ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_STRENGTH);
         return 0;
     }
+    return 1;
+}
+
+/*
+ * Validate that the random bit generator is of sufficient strength to generate
+ * a key of the specified length.
+ */
+static int rsa_validate_rng_strength(EVP_RAND_CTX *rng, int nbits)
+{
+    if (rng == NULL)
+        return 0;
+#ifdef FIPS_MODULE
+    /*
+     * This should become mainstream once similar tests are added to the other
+     * key generations and once there is a way to disable these checks.
+     */
+    if (EVP_RAND_get_strength(rng) < ossl_ifc_ffc_compute_security_bits(nbits)) {
+        ERR_raise(ERR_LIB_RSA,
+                  RSA_R_RANDOMNESS_SOURCE_STRENGTH_INSUFFICIENT);
+        return 0;
+    }
+#endif
     return 1;
 }
 
@@ -263,7 +285,7 @@ int ossl_rsa_sp800_56b_derive_params_from_pq(RSA *rsa, int nbits,
     if (rsa->dmp1 == NULL)
         rsa->dmp1 = BN_secure_new();
     if (rsa->dmp1 == NULL)
-	    goto err;
+        goto err;
     BN_set_flags(rsa->dmp1, BN_FLG_CONSTTIME);
     if (!BN_mod(rsa->dmp1, rsa->d, p1, ctx))
         goto err;
@@ -272,7 +294,7 @@ int ossl_rsa_sp800_56b_derive_params_from_pq(RSA *rsa, int nbits,
     if (rsa->dmq1 == NULL)
         rsa->dmq1 = BN_secure_new();
     if (rsa->dmq1 == NULL)
-	    goto err;
+        goto err;
     BN_set_flags(rsa->dmq1, BN_FLG_CONSTTIME);
     if (!BN_mod(rsa->dmq1, rsa->d, q1, ctx))
         goto err;
@@ -281,7 +303,7 @@ int ossl_rsa_sp800_56b_derive_params_from_pq(RSA *rsa, int nbits,
     BN_free(rsa->iqmp);
     rsa->iqmp = BN_secure_new();
     if (rsa->iqmp == NULL)
-	    goto err;
+        goto err;
     BN_set_flags(rsa->iqmp, BN_FLG_CONSTTIME);
     if (BN_mod_inverse(rsa->iqmp, rsa->q, rsa->p, ctx) == NULL)
         goto err;
@@ -348,6 +370,10 @@ int ossl_rsa_sp800_56b_generate_key(RSA *rsa, int nbits, const BIGNUM *efixed,
     if (!ossl_rsa_sp800_56b_validate_strength(nbits, -1))
         return 0;
 
+    /* Check that the RNG is capable of generating a key this large */
+   if (!rsa_validate_rng_strength(RAND_get0_private(rsa->libctx), nbits))
+        return 0;
+
     ctx = BN_CTX_new_ex(rsa->libctx);
     if (ctx == NULL)
         return 0;
@@ -403,9 +429,9 @@ int ossl_rsa_sp800_56b_pairwise_test(RSA *rsa, BN_CTX *ctx)
     BN_set_flags(k, BN_FLG_CONSTTIME);
 
     ret = (BN_set_word(k, 2)
-          && BN_mod_exp(tmp, k, rsa->e, rsa->n, ctx)
-          && BN_mod_exp(tmp, tmp, rsa->d, rsa->n, ctx)
-          && BN_cmp(k, tmp) == 0);
+           && BN_mod_exp(tmp, k, rsa->e, rsa->n, ctx)
+           && BN_mod_exp(tmp, tmp, rsa->d, rsa->n, ctx)
+           && BN_cmp(k, tmp) == 0);
     if (ret == 0)
         ERR_raise(ERR_LIB_RSA, RSA_R_PAIRWISE_TEST_FAILURE);
 err:

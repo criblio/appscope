@@ -5,6 +5,323 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.4
+
+2023-06-14 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.4`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.4`.
+
+### Fixes
+
+- [1499](https://github.com/criblio/appscope/issues/1499) AppScope no longer exposes the `backtrace` symbol. Before this fix, certain scoped applications would segfault when they called `backtrace`.
+- [1491](https://github.com/criblio/appscope/issues/1491) When you run AppScope in a Kubernetes pod, the pod now starts normally even when the pod definition is missing the `label` section.
+- [1481](https://github.com/criblio/appscope/issues/1481) When scoping Java apps that use SSL and that are run on certain JREs, AppScope no longer causes the scoped app to segfault.
+
+## AppScope 1.3.3
+
+2023-05-17 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.3`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.3`.
+
+### Improvements
+
+AppScope 1.3.3 removes our support for two Go versions that the Go project no longer supports: [1.9](https://go.dev/doc/go1.9) and [1.10](https://go.dev/doc/go1.10). This makes the AppScope code less complicated and more robust. Related issue: [#1452](https://github.com/criblio/appscope/issues/1452).
+
+### Fixes
+
+- [1461](https://github.com/criblio/appscope/issues/1461) In libc musl environments, attaching to an already-running but idle process now works normally. (Idle means not producing events at that moment.) 
+
+  - Before this fix, commands that rely on the IPC mechanism and/or the presence of a running periodic thread (e.g., `scope ps`, `scope inspect`, `scope update`) would not work, because AppScope's periodic thread would not start. For example, attaching AppScope to the Nginx master process running in an Alpine container, you would be unable to use the CLI to interact with the process. (This problem existed only in libc musl environments.)
+
+- [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) no longer seg fault when scoped.
+
+## AppScope 1.3.2
+
+2023-04-19 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.2`.
+
+### New Features and Improvements
+
+AppScope 1.3.2 introduces support for [Go version 1.20](https://go.dev/doc/go1.20).
+
+### Fixes
+
+- [#1409](https://github.com/criblio/appscope/issues/1409) The `scope k8s` command now preloads the application image into the k8s cluster, avoiding `failed to call webhook` errors.
+- [#1365](https://github.com/criblio/appscope/issues/1365) The `scope k8s` command now calls an up-to-date version of a k8s library needed for obtaining signed certificates from the k8s Certificate Authority. This fixes a problem where running in newer versions of k8s produced `the server doesn't have a resource type "certificatesigningrequests"` errors. 
+- [#1408](https://github.com/criblio/appscope/issues/1408) On older (pre-1.1.24) versions of Alpine and other distributions based on musl libc, the `scope run` command now works as expected, and no longer encounters `secure_getenv: symbol not found` errors.
+- [#1170](https://github.com/criblio/appscope/issues/1170) The way AppScope runs `pcre2` functions internally is improved, fixing various problems including Go crashes under certain conditions.
+- [#1147](https://github.com/criblio/appscope/issues/1147) Docker no longer crashes when scoped. (This bug appears only in pre-1.3 versions of AppScope.)
+
+## AppScope 1.3.1
+
+2023-03-21 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.1`.
+
+### Security Fixes
+
+- AppScope 1.3.1 updates dependencies to address concerns about vulnerabilities recently resolved in Go libraries. The relevant vulnerabilities are [CVE-2022-41721](https://nvd.nist.gov/vuln/detail/CVE-2022-41721), [CVE-2022-41723](https://nvd.nist.gov/vuln/detail/CVE-2022-41723), and [CVE-2022-41717](https://nvd.nist.gov/vuln/detail/CVE-2022-41717).
+
+## AppScope 1.3.0
+
+2023-03-21 - Feature Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.0`.
+
+### New Features and Improvements
+
+AppScope 1.3.0 introduces features that support analyzing crashes, obtaining snapshots of processes, troubleshooting transports, and dynamically managing configs. Meanwhile, AppScope's architecture, connection and payload handling, container-awareness, and CLI are all improved.
+
+AppScope 1.3.0 introduces support for: 
+
+- Instrumenting Go executables on ARM.
+- Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
+
+#### The Crash Analysis and Snapshot Features
+
+Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
+
+AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped.
+
+#### Troubleshooting Transports and Dynamically Managing Configs  
+
+AppScope now uses **inter-process communication** ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways. These include determining whether the process is scoped or not. If the process is scoped, AppScope can:
+- Determine the status of the transport AppScope is trying to use to convey events and metrics to a destination. This helps troubleshoot "Why am I getting no events or metrics?" scenarios.
+- Retrieve or dynamically update (modify) the AppScope config currently in effect.
+
+#### Improved Handling of Connections
+
+AppScope now uses a **backoff algorithm** for connections to avoid creating excessive network traffic and log entries. When a remote destination that AppScope tries to connect to rejects the connection or is not available, AppScope retries the connection at a progressively slower rate.
+
+#### Improved Handling of Payloads
+
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` now guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
+
+#### Simplified Architecture
+
+The `ldscope` utility no longer exists, and you can use CLI commands instead; `ldscope.log` has been renamed as `libscope.log`.
+
+#### CLI Improvements
+
+The AppScope CLI is enhanced in the following ways:
+- `scope start` can now attach to processes running in rootless and nested containers.
+- `scope detach`, when run with the new `--all` flag, detaches from all processes at once.
+- `scope stop`, a new command, runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations. This undoes the effects of the `scope attach`, `scope start`, and/or `scope service` commands.
+- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped.
+- `scope --passthrough` replaces `scope run --passthrough`.
+
+Three commands use IPC, which is new in AppScope 1.3.0. `scope inspect` and `scope update` are completely new, while `scope ps` has new capabilities thanks to IPC.
+- `scope inspect` retrieves the AppScope config currently in effect and determines the status of the transport AppScope is trying to use.
+- `scope update` modifies the current AppScope config.
+- `scope ps` now determines whether the processes it lists are scoped or not.
+
+### Fixes
+
+- [#1328](https://github.com/criblio/appscope/issues/1328) Scoping Terraform – e.g., `scope terraform plan` – no longer causes Terraform to crash. 
+- [#1310](https://github.com/criblio/appscope/issues/1310) Follow mode – i.e., running `scope events -f` to see the scoped app's events scrolling – works correctly again, fixing a regression in recent versions of AppScope.
+- [#1293](https://github.com/criblio/appscope/issues/1293) AppScope no longer causes Redis to crash when Redis (running as a service, and scoped) receives a `GET` or `SET` command.
+- [#1252](https://github.com/criblio/appscope/issues/1252) AppScope no longer uses the [UPX](https://upx.github.io/) executable file compressor, avoiding scenarios where some Java applications crashed when scoped.
+- [#1153](https://github.com/criblio/appscope/issues/1153) The `scope ps` command no longer erroneously reports that a process is scoped even after `scope detach` has been run for that process.
+
+## AppScope 1.2.2
+
+2023-01-18 - Maintenance Release
+
+<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL: [CVE-2022-3602](https://nvd.nist.gov/vuln/detail/CVE-2022-3602). Cribl strongly recommends upgrading to AppScope 1.2.2 as soon as possible. See [this](https://github.com/criblio/appscope/security/advisories/GHSA-j3cg-7mpq-v62p) AppScope security advisory</strong>.
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.2`.
+
+### New Features and Improvements
+
+AppScope 1.2.2 introduces: 
+
+- Support for [OCI containers](https://opencontainers.org/) run by the [Podman](https://podman.io/) container engine. See issue [#1216](https://github.com/criblio/appscope/issues/1216).
+
+- Support for writing payloads to files on disk while simultaneously sending events and metrics to Cribl Stream or Cribl Edge. To do this, use the new environment variable `SCOPE_PAYLOAD_TO_DISK` together with existing env vars `SCOPE_CRIBL_ENABLE` and `SCOPE_PAYLOAD_ENABLE`, as described [here](/docs/data-routing). See issue [#1158](https://github.com/criblio/appscope/issues/1158).
+
+AppScope 1.2.2 also updates the [UPX](https://upx.github.io/) executable packer from version 4.0.0 to version 4.0.1. See issue [#1214](https://github.com/criblio/appscope/issues/1214).
+
+### Fixes
+
+- [#1258](https://github.com/criblio/appscope/issues/1258) A scoped application no longer crashes when one of its network connections is [closed](/docs/schema-reference#eventnetclose) and then an attempt is made to [send](/docs/schema-reference#eventnettx) or [receive](/docs/schema-reference#eventnetrx) data on the same connection.
+- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/troubleshooting#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
+- [#1197](https://github.com/criblio/appscope/issues/1197) When run in a container that is itself inside a container (i.e., Docker in Docker), AppScope now successfully locates the host namespace.
+
+### Security Fixes
+
+- [#1182](https://github.com/criblio/appscope/issues/1182) AppScope 1.2.2 updates OpenSSL from version 3.0.0 to version 3.0.7, fixing an OpenSSL security vulnerability, as described in [this](https://github.com/criblio/appscope/security/advisories/GHSA-j3cg-7mpq-v62p) AppScope security advisory.
+
+## AppScope 1.2.1
+
+2022-12-07 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.1`.
+
+### New Features and Improvements
+
+AppScope 1.2.1 introduces: 
+
+- Support for attaching to processes running in [LXD and LXC containers](https://www.sumologic.com/blog/lxc-lxd-linux-containers/).
+- A new `--all` or `-a` flag for the `scope detach` [command](/docs/cli-reference#detach). Running `scope detach --all` detaches AppScope from all processes.
+
+### Fixes
+
+- [#1055](https://github.com/criblio/appscope/issues/1055) AppScope now successfully attaches to processes given [certain combinations of mount and PID namespaces](/docs/known-issues#appscope-120) that previously caused attach to fail.
+- [#1192](https://github.com/criblio/appscope/issues/1192) Attempting to scope applications that use their own custom-built versions of system libraries no longer causes those applications to crash. However, scoping such applications is not supported, and AppScope will return a `failed to find libc in target process` error.
+- [#1186](https://github.com/criblio/appscope/issues/1186) Scoping a MySQL process no longer causes `mysqld` to crash.
+
+## AppScope 1.2.0
+
+2022-11-09 - Feature Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.0`.
+
+### New Features and Improvements
+
+AppScope 1.2.0 introduces substantial new functionality:
+
+- The new `scope start` command, which takes a **filter list** as an argument. The filter list has an allowlist section for specifying which processes to scope (along with desired configs), and an optional denylist section for specifying which processes **not** to scope. Related issues: [#987](https://github.com/criblio/appscope/issues/987),[#1027](https://github.com/criblio/appscope/issues/1027),[#1038](https://github.com/criblio/appscope/issues/1038),[#1069](https://github.com/criblio/appscope/issues/1069).
+
+- Integration with Cribl Edge and Cribl Stream version 4.0, whose built-in AppScope Source now supports creating filters (equivalent to editing the filter list described above). Cribl Edge and Cribl Stream also now provide an AppScope Config Editor for creating AppScope config files (variants of `scope.yml`) and storing them in an AppScope Config Library.  
+
+- The new `scope detach` command, which stops scoping a process without terminating that process. Related issues: [#370](https://github.com/criblio/appscope/issues/370),[#1039](https://github.com/criblio/appscope/issues/1039),[#1085](https://github.com/criblio/appscope/issues/1085),[#1087](https://github.com/criblio/appscope/issues/1087),[#1088](https://github.com/criblio/appscope/issues/1088),[#1089](https://github.com/criblio/appscope/issues/1089),[#1094](https://github.com/criblio/appscope/issues/1094),[#1107](https://github.com/criblio/appscope/issues/1107),[#1129](https://github.com/criblio/appscope/issues/1129).
+
+- To attach to or detach from a process running in a container, it is no longer necessary to run AppScope within the container. You can just scope the container processes from the host. Related issues: [#1061](https://github.com/criblio/appscope/issues/1061),
+[#1119](https://github.com/criblio/appscope/issues/1119).
+
+- Support for executables built with Go 1.19. (This release also removes support for executables built with Go 1.8.) Related issue: [#1073](https://github.com/criblio/appscope/issues/1073).
+
+This release also improves the `scope ps` command, which now lists all scoped processes rather than listing all processes into which the library was loaded. Related issue: [#1097](https://github.com/criblio/appscope/issues/1097).
+
+## AppScope 1.1.3
+
+2022-09-06 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.3`.
+
+### Fixes
+
+- [#1067](https://github.com/criblio/appscope/issues/1067) When you run `scope attach` and then select an ID that's beyond the range of the resulting list, AppScope now handles this gracefully, and the AppScope CLI no longer crashes.
+- [#1080](https://github.com/criblio/appscope/issues/1080) On an M1 Mac, trying to scope a Go static executable in a Docker container emulating x86_64 Linux results in an address mapping conflict between the Go executable and the emulator. AppScope now handles this limitation by allowing the Go executable to run un-scoped. With this fix, the Go executable no longer segfaults.
+
+## AppScope 1.1.2
+
+2022-08-09 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path. 
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.2`.
+
+### New Features and Improvements
+
+- [#1025](https://github.com/criblio/appscope/issues/1025) The process‑start message (the [start.msg](schema-reference#eventstartmsg) event) now includes a total of four identifiers. By itself, the new **UUID** process ID is unique for a given machine. In principle, **UUID** together with the new **Machine ID** constitutes a tuple ID that is unique across all machine namespaces. Here's a summary of the IDs available in AppScope 1.1.2:
+    - **UUID** (new in AppScope 1.1.2), with key `uuid` and a value in [canonical UUID form](https://en.wikipedia.org/wiki/Universally_unique_identifier). UUID is a universally-unique process identifier, meaning that no two processes will ever have the same UUID value on the same machine.
+    - **Machine ID** (new in AppScope 1.1.2), with key `machine_id` and a value that AppScope obtains from `/etc/machine-id`. The machine ID uniquely identifies the host, as described in the [man page](https://man7.org/linux/man-pages/man5/machine-id.5.html). When `/etc/machine-id` is not available (e.g., in Alpine, or in a container), AppScope generates the machine ID using a repeatable MD5 hash of the host's first MAC address. Two containers on the same host can have the same machine ID.
+    - **Process ID**, with key `pid` and a value that is always unique at any given time, but that the machine can reuse for different processes at different times.
+    - **ID**, with key `id` and a value that concatenates (and may truncate) the scoped app's hostname, procname, and command. This value is not guaranteed to be unique.
+- [#1037](https://github.com/criblio/appscope/issues/1037) You can now run `scope service` on Linux distros that use the OpenRC init manager (e.g., Alpine), as well as on distros that use systemd (which was already supported). See the [CLI reference](cli-reference#service).
+
+### Fixes
+
+- [#1035](https://github.com/criblio/appscope/issues/1035) The `scope service` command no longer ignores the `-c` (`--cribldest`), `-e` (`--eventdest`), and `-m` (`--metricdest`) options.
+
 ## AppScope 1.1.1
 
 2022-07-12 - Maintenance Release
@@ -44,7 +361,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
 
-- [#637](https://github.com/criblio/appscope/issues/637) Support for go17 and go18.
+- [#637](https://github.com/criblio/appscope/issues/637) Support for Go versions 17 and 18.
 - [#904](https://github.com/criblio/appscope/issues/904) Support for HTTP2 when scoping Go executables. 
 - [#667](https://github.com/criblio/appscope/issues/667) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
 

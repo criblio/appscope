@@ -8,7 +8,10 @@
 
     - name: Working With AppScope
       path: /docs/working-with
-      
+
+    - name: Events and Metrics in AppScope
+      path: /docs/events-and-metrics
+
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
@@ -46,10 +49,16 @@
     - name: Integrating with Cribl
       path: /docs/cribl-integration
 
+    - name: Troubleshooting
+      path: /docs/troubleshooting
+
 - name: Reference
   child: 
     - name: Config File
       path: /docs/config-file
+
+    - name: Rules File
+      path: /docs/rules-file
 
     - name: CLI Reference
       path: /docs/cli-reference

@@ -6,10 +6,8 @@
 #include <string.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "cJSON.h"
 #include "dbg.h"
 #include "mtcformat.h"
-#include "scopetypes.h"
 #include "strset.h"
 #include "com.h"
 #include "scopestdlib.h"
@@ -165,7 +163,7 @@ addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, s
 }
 
 static void
-addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, strset_t *addedFields)
+addStatsdCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes, strset_t *addedFields)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -246,16 +244,175 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     // add one that's already in the set, skip it.  In this way precedence
     // is given to capturedFields then custom fields then remaining fields.
     strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
-    addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);
-    addCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
-    addStatsdFields(fmt, e->fields, &end, &bytes, addedFields, fieldFilter);
-    strSetDestroy(&addedFields);
+    if (addedFields) {
+        addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);
+        addStatsdCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
+        addStatsdFields(fmt, e->fields, &end, &bytes, addedFields, fieldFilter);
+        strSetDestroy(&addedFields);
+    }
 
     // Now that we're done, we can count the trailing newline
     bytes += 1;
 
     return end_start;
 }
+
+#if SCOPE_PROM_SUPPORT != 0
+
+static bool
+appendPromField(FILE *stream, mtc_fmt_t *fmt, event_field_t *field, strset_t *addedFields)
+{
+    if (!fmt || !field) return FALSE;
+
+    char delim;
+    if (strSetEntryCount(addedFields) == 1) {
+        delim= '{';
+    } else {
+        delim= ',';
+    }
+
+    int retVal = -1;
+    switch (field->value_type) {
+        case FMT_NUM:
+            retVal = scope_fprintf(stream, "%c%s=\"%lli\"", delim, field->name, field->value.num);
+            break;
+        case FMT_STR:
+            retVal = scope_fprintf(stream, "%c%s=\"%s\"", delim, field->name, field->value.str);
+            break;
+        default:
+            DBG("%d %s", field->value_type, field->name);
+    }
+    return retVal >= 0;
+}
+
+static bool
+addPromFields(mtc_fmt_t *fmt, event_field_t *fields, FILE *stream, strset_t *addedFields, regex_t *fieldFilter)
+{
+    if (!fmt || !stream) return FALSE;
+    if (!fields) return TRUE;            // ok, just no fields to add
+
+    event_field_t *field;
+    for (field = fields; field->value_type != FMT_END; field++) {
+
+        if (fieldFilter && regexec_wrapper(fieldFilter, field->name, 0, NULL, 0)) continue;
+
+        // Skip empty values
+        if (field->value_type == FMT_STR && !field->value.str) continue;
+
+        // Honor Verbosity
+        if (field->cardinality > fmt->verbosity) continue;
+
+        // Don't allow duplicate field names
+        if (!strSetAdd(addedFields, field->name)) continue;
+
+        if (!appendPromField(stream, fmt, field, addedFields)) return FALSE;
+    }
+
+    return TRUE;
+}
+
+static bool
+addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, FILE *stream, strset_t *addedFields)
+{
+    if (!fmt || !stream) return FALSE;
+    if (!tags || !*tags) return TRUE;    // ok, just no fields to add
+
+    custom_tag_t *tag;
+    int i = 0;
+    while ((tag = tags[i++])) {
+
+        // Don't allow duplicate field names
+        if (!strSetAdd(addedFields, tag->name)) continue;
+
+        // No verbosity setting exists for custom fields.
+
+        event_field_t f = STRFIELD(tag->name, tag->value, 0, TRUE);
+        if (!appendPromField(stream, fmt, &f, addedFields)) return FALSE;
+    }
+
+    return TRUE;
+}
+
+static const char *
+promTypeStr(data_type_t type)
+{
+    if (type == CURRENT) return "gauge";
+    // For prometheus format, we're not currently using
+    // timer, histogram, or set.  Return counter for all of these.
+    return "counter";
+}
+
+static char *
+mtcFormatPromString(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
+{
+    if (!fmt || !evt) return NULL;
+
+    bool completely_successful = FALSE;
+    char *name = NULL;
+    FILE *stream = NULL;
+    char *prom_str = NULL;
+    size_t size = 0;
+    strset_t *addedFields = NULL;
+
+    // memstream, just to let it manage growth in prom_str as needed.
+    stream = scope_open_memstream(&prom_str, &size);
+    if (!stream || !prom_str) goto out;
+
+    // Copy metric name into a buffer, then convert "." to "_".
+    if (scope_asprintf(&name, "%s%s", fmt->statsd.prefix, evt->name) < 0) {
+        name = NULL;
+        goto out;
+    }
+    char *ptr;
+    for (ptr=name; *ptr!='\0'; ptr++) {
+        if (*ptr=='.') *ptr='_';
+    }
+
+    // Add the TYPE comment line
+    if (scope_fprintf(stream, "# TYPE %s %s\n", name, promTypeStr(evt->type) ) < 0) goto out;
+    // Add the metric, start with the name
+    if (scope_fprintf(stream, "%s", name) < 0) goto out;
+
+
+    // Add fields to the metric
+    if (!(addedFields = strSetCreate(DEFAULT_SET_SIZE))) goto out;
+    if (!addPromFields(fmt, evt->capturedFields, stream, addedFields, NULL)) goto out;
+    if (!addPromCustomFields(fmt, fmt->tags, stream, addedFields)) goto out;
+    if (!addPromFields(fmt, evt->fields, stream, addedFields, fieldFilter)) goto out;
+    if (strSetEntryCount(addedFields) >= 1) {
+        if (scope_fprintf(stream, "}") < 0) goto out;
+    }
+
+    // Add the value to the metric
+    switch ( evt->value.type ) {
+        case FMT_INT:
+            if (scope_fprintf(stream, " %lli\n", evt->value.integer) < 0) goto out;
+            break;
+        case FMT_FLT:
+            if (scope_fprintf(stream, " %.2f\n", evt->value.floating) < 0) goto out;
+            break;
+        default:
+            DBG(NULL);
+    }
+
+    // Prometheus metric timestamps are optional.
+    // If desired, here's the spot to add them.
+
+    completely_successful = TRUE;
+
+out:
+    if (stream) scope_fclose(stream);
+    if (name) scope_free(name);
+    if (!completely_successful) {
+        DBG("%d %s", evt->value.type, evt->name);
+        if (prom_str) scope_free(prom_str);
+        prom_str = NULL;
+    }
+    strSetDestroy(&addedFields);
+    return prom_str;
+}
+
+#endif
 
 char *
 mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
@@ -299,6 +456,10 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
                 msg[strsize+1] = '\0';
             }
         }
+#if SCOPE_PROM_SUPPORT != 0
+    } else if (fmt->format == CFG_FMT_PROMETHEUS) {
+        msg = mtcFormatPromString(fmt, evt, fieldFilter);
+#endif
     }
 
 out:

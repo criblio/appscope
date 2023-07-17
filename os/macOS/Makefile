@@ -25,7 +25,7 @@ $(PCRE2_AR):
 	cd contrib/pcre2/build && cmake ..
 	cd contrib/pcre2/build && make
 
-libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/scopestdlib.c src/dbg.c src/search.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c
+libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/scopestdlib.c src/dbg.c src/search.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c src/ipc.c src/ipc_resp.c
 	@echo "Building libscope.so ..."
 	make $(PCRE2_AR)
 	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)
@@ -67,7 +67,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@echo "Running Tests and Generating Test Coverage"
-	test/execute.sh
+	test/unit/execute.sh
 # see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)

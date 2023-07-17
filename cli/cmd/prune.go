@@ -14,9 +14,9 @@ var pruneCmd = &cobra.Command{
 	Use:   "prune [flags]",
 	Short: "Prune deletes session history",
 	Long:  `Prunes (deletes) one or more sessions from the history.`,
-	Example: `scope prune -k 20
-scope prune -a
-scope prune -d 1`,
+	Example: `  scope prune -k 20
+  scope prune -a
+  scope prune -d 1`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		keep, _ := cmd.Flags().GetInt("keep")
@@ -75,8 +75,8 @@ scope prune -d 1`,
 
 func init() {
 	RootCmd.AddCommand(pruneCmd)
-	pruneCmd.Flags().IntP("keep", "k", 0, "Keep last <keep> sessions")
-	pruneCmd.Flags().IntP("delete", "d", 0, "Delete last <delete> sessions")
+	pruneCmd.Flags().IntP("keep", "k", 0, "Keep last <n> sessions")
+	pruneCmd.Flags().IntP("delete", "d", 0, "Delete last <n> sessions")
 	pruneCmd.Flags().BoolP("all", "a", false, "Delete all sessions")
 	pruneCmd.Flags().BoolP("force", "f", false, "Do not prompt for confirmation")
 }

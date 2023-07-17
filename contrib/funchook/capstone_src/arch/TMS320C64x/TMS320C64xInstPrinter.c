@@ -3,6 +3,17 @@
 
 #ifdef CAPSTONE_HAS_TMS320C64X
 
+#ifdef _MSC_VER
+// Disable security warnings for strcpy
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
+// Banned API Usage : strcpy is a Banned API as listed in dontuse.h for
+// security purposes.
+#pragma warning(disable:28719)
+#endif
+
 #include <ctype.h>
 #include <string.h>
 
@@ -16,7 +27,7 @@
 
 #include "capstone/tms320c64x.h"
 
-static char *getRegisterName(unsigned RegNo);
+static const char *getRegisterName(unsigned RegNo);
 static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
 static void printMemOperand(MCInst *MI, unsigned OpNo, SStream *O);
 static void printMemOperand2(MCInst *MI, unsigned OpNo, SStream *O);
@@ -59,8 +70,6 @@ void TMS320C64x_post_printer(csh ud, cs_insn *insn, char *insn_asm, MCInst *mci)
 		SStream_Init(&ss);
 		if (tms320c64x->condition.reg != TMS320C64X_REG_INVALID)
 			SStream_concat(&ss, "[%c%s]|", (tms320c64x->condition.zero == 1) ? '!' : '|', cs_reg_name(ud, tms320c64x->condition.reg));
-		else
-			SStream_concat0(&ss, "||||||");
 
 		p = strchr(insn_asm, '\t');
 		if (p != NULL)
@@ -68,13 +77,13 @@ void TMS320C64x_post_printer(csh ud, cs_insn *insn, char *insn_asm, MCInst *mci)
 
 		SStream_concat0(&ss, insn_asm);
 		if ((p != NULL) && (((p2 = strchr(p, '[')) != NULL) || ((p2 = strchr(p, '(')) != NULL))) {
-			while ((p2 > p) && ((*p2 != 'A') && (*p2 != 'B')))
+			while ((p2 > p) && ((*p2 != 'a') && (*p2 != 'b')))
 				p2--;
 			if (p2 == p) {
 				strcpy(insn_asm, "Invalid!");
 				return;
 			}
-			if (*p2 == 'A')
+			if (*p2 == 'a')
 				strcpy(tmp, "1T");
 			else
 				strcpy(tmp, "2T");
@@ -102,7 +111,7 @@ void TMS320C64x_post_printer(csh ud, cs_insn *insn, char *insn_asm, MCInst *mci)
 			SStream_concat(&ss, "\t%s", p);
 
 		if (tms320c64x->parallel != 0)
-			SStream_concat(&ss, "\t||");
+			SStream_concat0(&ss, "\t||");
 
 		/* insn_asm is a buffer from an SStream, so there should be enough space */
 		strcpy(insn_asm, ss.buffer);

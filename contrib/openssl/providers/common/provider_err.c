@@ -80,6 +80,8 @@ static const ERR_STRING_DATA PROV_str_reasons[] = {
     "invalid digest length"},
     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_INVALID_DIGEST_SIZE),
     "invalid digest size"},
+    {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_INVALID_INPUT_LENGTH),
+    "invalid input length"},
     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_INVALID_ITERATION_COUNT),
     "invalid iteration count"},
     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_INVALID_IV_LENGTH), "invalid iv length"},
@@ -217,7 +219,7 @@ static const ERR_STRING_DATA PROV_str_reasons[] = {
 
 #endif
 
-int err_load_PROV_strings_int(void)
+int ossl_err_load_PROV_strings(void)
 {
 #ifndef OPENSSL_NO_ERR
     if (ERR_reason_error_string(PROV_str_reasons[0].error) == NULL)

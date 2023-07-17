@@ -23,6 +23,12 @@ osGetProcMemory(pid_t pid)
 }
 
 int
+osGetProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    return -1;
+}
+
+int
 osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;
@@ -73,7 +79,7 @@ osInitTSC(platform_time_t *cfg)
 }
 
 int
-osIsFilePresent(pid_t pid, const char *path)
+osIsFilePresent(const char *path)
 {
     struct stat sb = {};
     if (stat(path, &sb) != 0) {
@@ -114,7 +120,7 @@ osGetCmdline(pid_t pid, char **cmd)
  * for OSX.
  */
 bool
-osThreadInit(void(*handler)(int), unsigned interval)
+osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned interval)
 {
     return TRUE;
 }
@@ -186,4 +192,19 @@ osGetGroupName(unsigned gid)
 long long
 osGetProcCPU(void) {
     return -1;
+}
+
+bool
+osMemPermAllow(void *addr, size_t len, int flags, int extraflags) {
+    return FALSE;
+}
+
+bool
+osMemPermRestore(void *addr, size_t len, int flags) {
+    return FALSE;
+}
+
+bool
+osGetBaseAddr(uint64_t *addr) {
+    return FALSE;
 }

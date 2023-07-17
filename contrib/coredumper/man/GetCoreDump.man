@@ -1,0 +1,132 @@
+'\" t
+.TH GETCOREDUMP 3 "Feb 15, 2007"
+.SH NAME
+GetCoreDump, GetCompressedCoreDump, GetCoreDumpWith \- creates a copy-on-write snapshot
+of the current process
+.SH SYNOPSIS
+.ad l
+.PP
+.B "#include \*(lqgoogle/coredumper.h\*(rq"
+.PP
+.B int GetCoreDump(void);
+.PP
+.BI int\~Get\%Core\%Dump\%With(const\~struct\~Core\%Dump\%Parameters\~* params );
+.HP 26
+.BI int\~Get\%Compressed\%Core\%Dump(const\~struct\~Coredumper\%Compressor\ \:\
+    compressors[] ,\ \:struct\~Coredumper\%Compressor\ \:** selected_compressor );
+.ad b
+.SH DESCRIPTION
+The \fBGetCoreDump\fP() function returns a file handle that can be
+read to obtain a snapshot of the current state of the calling process. This
+function is a convenience wrapper for \fBGetCoreDumpWith\fP() using the default
+parameters.
+.PP
+The \fBGetCoreDumpWith\fP() function returns a file handle that can be read
+to obtain a snapshot of the current state of the calling process using the
+parameters specified in the \fBCoreDumpParameters\fP structure. The
+parameters can specify any behaviour of the core dumper however the limiting
+values in the parameter will be ignored in this type of core dump.
+.PP
+The \fBGetCompressedCoreDump\fP() function returns a file handle to a
+core file that has been compressed on the fly. This function is a convenience
+wrapper for \fBGetCoreDumpWith\fP(). In
+.IR compressor ,
+the caller passes a pointer to an array of possible compressors:
+.sp
+.RS
+.nf
+struct CoredumperCompressor {
+  const char *compressor;  // File name of compressor; e.g. \*(lqgzip\*(rq
+  const char *const *args; // execv()-style command line arguments
+  const char *suffix;      // File name suffix; e.g. \*(lq.gz\*(rq
+};
+.fi
+.RE
+.PP
+The
+.I suffix
+will be ignored by the \fBGetCoreDump\fP() and
+\fBGetCompressedCoreDump\fP() functions, and is only needed for the
+\fBWriteCoreDump\fP() family of functions.
+.PP
+Array entries will be tried in sequence until an executable compressor
+has been found or the end of the array has been reached. The end is
+signalled by an entry that has been zero'd out completely. An empty
+string in place of the
+.I compressor
+name signals that no compression should be performed.
+.PP
+There are several pre-defined compressor descriptions available:
+.TP \w'COREDUMPER_'u
+.B COREDUMPER_COMPRESSED
+Try compressing with either
+.BR bzip2 (1),
+.BR gzip (1),
+or 
+.BR compress (1).
+If all of those fail, fall back on generating an uncompressed image.
+.TP
+.B COREDUMPER_BZIP2_COMPRESSED
+.TP
+.B COREDUMPER_GZIP_COMPRESSED
+.TP
+.B COREDUMPER_COMPRESS_COMPRESSED
+Try compressing with a specific compressor. Fail if no compressor could
+be found.
+.TP
+.B COREDUMPER_TRY_BZIP2_COMPRESSED
+.TP
+.B COREDUMPER_TRY_GZIP_COMPRESSED
+.TP
+.B COREDUMPER_TRY_COMPRESS_COMPRESSED
+Try compressing with a specific compressor. Fall back on generating an
+uncompressed image, if the specified compressor is unavailable.
+.TP
+.B COREDUMPER_UNCOMPRESSED
+Always create an uncompressed core file.
+.PP
+If
+.I selected_compressor
+is non-NULL, it will be set to the actual
+.I CoredumperCompressor
+object used.
+.SH RETURN VALUE
+\fBGetCoreDump\fP(), \fBGetCoreDumpWith\fP(), and \fBGetCompressedCoreDump\fP()
+all return a non-seekable file handle on success. The copy-on-write snapshot
+will automatically be released, when the caller \fBclose\fP()s this file
+handle.
+.PP
+On error \-1 will be returned and
+.I errno
+will be set appropriately.
+.SH ERRORS
+The most common reason for failure is for another process to already
+use the debugging API that is needed to generate the core
+files. This could, for instance, be
+.BR gdb (1),
+or
+.BR strace(1).
+.SH NOTES
+The coredumper functions momentarily suspend all threads, while
+creating a COW (copy-on-write) copy of the process's address
+space. The snapshot shows up as a new child process of the current
+process, but memory requirements are relatively small, as most pages
+are shared between parent and child.
+.PP
+The functions are neither reentrant nor async signal safe. Callers
+should wrap a mutex around their invocation, if necessary.
+.PP
+The current implementation tries very hard to behave reasonably when
+called from a signal handler, but no guarantees are made that this
+will always work. Most importantly, it is the caller's responsibility
+to make sure that there are never more than one instance of functions
+from the \fBGetCoreDump\fP() or \fBWriteCoreDump\fP() family executing
+concurrently.
+.SH "SEE ALSO"
+.BR WriteCoreDump (3),
+.BR WriteCoreDumpWith (3),
+.BR WriteCoreDumpLimited (3),
+.BR WriteCoreDumpLimitedByPriority (3),
+.BR WriteCompressedCoreDump(3),
+and
+.BR CoreDumpParameters (3).

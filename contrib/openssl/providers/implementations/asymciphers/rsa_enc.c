@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -22,7 +22,7 @@
 #include <openssl/err.h>
 #include <openssl/proverr.h>
 /* Just for SSL_MAX_MASTER_KEY_LENGTH */
-#include <openssl/ssl.h>
+#include <openssl/prov_ssl.h>
 #include "internal/constant_time.h"
 #include "internal/sizes.h"
 #include "crypto/rsa.h"
@@ -371,7 +371,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
     p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
     if (p != NULL && !OSSL_PARAM_set_utf8_string(p, prsactx->oaep_md == NULL
                                                     ? ""
-                                                    : EVP_MD_name(prsactx->oaep_md)))
+                                                    : EVP_MD_get0_name(prsactx->oaep_md)))
         return 0;
 
     p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
@@ -381,7 +381,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
 
         if (!OSSL_PARAM_set_utf8_string(p, mgf1_md == NULL
                                            ? ""
-                                           : EVP_MD_name(mgf1_md)))
+                                           : EVP_MD_get0_name(mgf1_md)))
         return 0;
     }
 
@@ -425,7 +425,7 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
     const OSSL_PARAM *p;
     char mdname[OSSL_MAX_NAME_SIZE];
     char mdprops[OSSL_MAX_PROPQUERY_SIZE] = { '\0' };
-    char *str = mdname;
+    char *str = NULL;
 
     if (prsactx == NULL)
         return 0;
@@ -434,13 +434,14 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
 
     p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
     if (p != NULL) {
+        str = mdname;
         if (!OSSL_PARAM_get_utf8_string(p, &str, sizeof(mdname)))
             return 0;
 
-        str = mdprops;
         p = OSSL_PARAM_locate_const(params,
                                     OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST_PROPS);
         if (p != NULL) {
+            str = mdprops;
             if (!OSSL_PARAM_get_utf8_string(p, &str, sizeof(mdprops)))
                 return 0;
         }
@@ -496,13 +497,14 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
 
     p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
     if (p != NULL) {
+        str = mdname;
         if (!OSSL_PARAM_get_utf8_string(p, &str, sizeof(mdname)))
             return 0;
 
-        str = mdprops;
         p = OSSL_PARAM_locate_const(params,
                                     OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST_PROPS);
         if (p != NULL) {
+            str = mdprops;
             if (!OSSL_PARAM_get_utf8_string(p, &str, sizeof(mdprops)))
                 return 0;
         } else {

@@ -4,9 +4,10 @@
 #include "cfg.h"
 
 typedef struct rtconfig_t {
-    int urls;
+    bool funcs_attached;       // TRUE when functions are interposed, FALSE otherwise
     int blockconn;
     config_t *staticfg;
+    char *cfgStr;              // String representation of `staticfg` field
 } rtconfig;
 
 extern rtconfig g_cfg;

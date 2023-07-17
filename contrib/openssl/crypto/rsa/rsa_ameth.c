@@ -1,5 +1,5 @@
 /*
- * Copyright 2006-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2006-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -160,6 +160,7 @@ static int rsa_priv_encode(PKCS8_PRIV_KEY_INFO *p8, const EVP_PKEY *pkey)
                          strtype, str, rk, rklen)) {
         ERR_raise(ERR_LIB_RSA, ERR_R_MALLOC_FAILURE);
         ASN1_STRING_free(str);
+        OPENSSL_clear_free(rk, rklen);
         return 0;
     }
 
@@ -427,7 +428,7 @@ static int rsa_pkey_ctrl(EVP_PKEY *pkey, int op, long arg1, void *arg2)
                 ERR_raise(ERR_LIB_RSA, ERR_R_INTERNAL_ERROR);
                 return 0;
             }
-            *(int *)arg2 = EVP_MD_type(md);
+            *(int *)arg2 = EVP_MD_get_type(md);
             /* Return of 2 indicates this MD is mandatory */
             return 2;
         }
@@ -454,13 +455,13 @@ static RSA_PSS_PARAMS *rsa_ctx_to_pss(EVP_PKEY_CTX *pkctx)
         return NULL;
     if (EVP_PKEY_CTX_get_rsa_mgf1_md(pkctx, &mgf1md) <= 0)
         return NULL;
-    if (!EVP_PKEY_CTX_get_rsa_pss_saltlen(pkctx, &saltlen))
+    if (EVP_PKEY_CTX_get_rsa_pss_saltlen(pkctx, &saltlen) <= 0)
         return NULL;
     if (saltlen == -1) {
-        saltlen = EVP_MD_size(sigmd);
+        saltlen = EVP_MD_get_size(sigmd);
     } else if (saltlen == -2 || saltlen == -3) {
-        saltlen = EVP_PKEY_size(pk) - EVP_MD_size(sigmd) - 2;
-        if ((EVP_PKEY_bits(pk) & 0x7) == 1)
+        saltlen = EVP_PKEY_get_size(pk) - EVP_MD_get_size(sigmd) - 2;
+        if ((EVP_PKEY_get_bits(pk) & 0x7) == 1)
             saltlen--;
         if (saltlen < 0)
             return NULL;
@@ -545,7 +546,7 @@ int ossl_rsa_pss_to_ctx(EVP_MD_CTX *ctx, EVP_PKEY_CTX *pkctx,
         const EVP_MD *checkmd;
         if (EVP_PKEY_CTX_get_signature_md(pkctx, &checkmd) <= 0)
             goto err;
-        if (EVP_MD_type(md) != EVP_MD_type(checkmd)) {
+        if (EVP_MD_get_type(md) != EVP_MD_get_type(checkmd)) {
             ERR_raise(ERR_LIB_RSA, RSA_R_DIGEST_DOES_NOT_MATCH);
             goto err;
         }
@@ -629,7 +630,7 @@ static int rsa_item_sign(EVP_MD_CTX *ctx, const ASN1_ITEM *it, const void *asn,
                          ASN1_BIT_STRING *sig)
 {
     int pad_mode;
-    EVP_PKEY_CTX *pkctx = EVP_MD_CTX_pkey_ctx(ctx);
+    EVP_PKEY_CTX *pkctx = EVP_MD_CTX_get_pkey_ctx(ctx);
 
     if (EVP_PKEY_CTX_get_rsa_padding(pkctx, &pad_mode) <= 0)
         return 0;
@@ -674,18 +675,19 @@ static int rsa_sig_info_set(X509_SIG_INFO *siginf, const X509_ALGOR *sigalg,
     pss = ossl_rsa_pss_decode(sigalg);
     if (!ossl_rsa_pss_get_param(pss, &md, &mgf1md, &saltlen))
         goto err;
-    mdnid = EVP_MD_type(md);
+    mdnid = EVP_MD_get_type(md);
     /*
      * For TLS need SHA256, SHA384 or SHA512, digest and MGF1 digest must
      * match and salt length must equal digest size
      */
     if ((mdnid == NID_sha256 || mdnid == NID_sha384 || mdnid == NID_sha512)
-            && mdnid == EVP_MD_type(mgf1md) && saltlen == EVP_MD_size(md))
+            && mdnid == EVP_MD_get_type(mgf1md)
+            && saltlen == EVP_MD_get_size(md))
         flags = X509_SIG_INFO_TLS;
     else
         flags = 0;
     /* Note: security bits half number of digest bits */
-    secbits = EVP_MD_size(md) * 4;
+    secbits = EVP_MD_get_size(md) * 4;
     /*
      * SHA1 and MD5 are known to be broken. Reduce security bits so that
      * they're no longer accepted at security level 1. The real values don't
@@ -725,7 +727,8 @@ static size_t rsa_pkey_dirty_cnt(const EVP_PKEY *pkey)
  * checks in this method since the caller tests EVP_KEYMGMT_is_a() first.
  */
 static int rsa_int_export_to(const EVP_PKEY *from, int rsa_type,
-                             void *to_keydata, EVP_KEYMGMT *to_keymgmt,
+                             void *to_keydata,
+                             OSSL_FUNC_keymgmt_import_fn *importer,
                              OSSL_LIB_CTX *libctx, const char *propq)
 {
     RSA *rsa = from->pkey.rsa;
@@ -736,18 +739,11 @@ static int rsa_int_export_to(const EVP_PKEY *from, int rsa_type,
 
     if (tmpl == NULL)
         return 0;
-    /*
-     * If the RSA method is foreign, then we can't be sure of anything, and
-     * can therefore not export or pretend to export.
-     */
-    if (RSA_get_method(rsa) != RSA_PKCS1_OpenSSL())
-        goto err;
-
     /* Public parameters must always be present */
     if (RSA_get0_n(rsa) == NULL || RSA_get0_e(rsa) == NULL)
         goto err;
 
-    if (!ossl_rsa_todata(rsa, tmpl, NULL))
+    if (!ossl_rsa_todata(rsa, tmpl, NULL, 1))
         goto err;
 
     selection |= OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
@@ -762,8 +758,8 @@ static int rsa_int_export_to(const EVP_PKEY *from, int rsa_type,
         if (!ossl_rsa_pss_get_param_unverified(rsa->pss, &md, &mgf1md,
                                                &saltlen, &trailerfield))
             goto err;
-        md_nid = EVP_MD_type(md);
-        mgf1md_nid = EVP_MD_type(mgf1md);
+        md_nid = EVP_MD_get_type(md);
+        mgf1md_nid = EVP_MD_get_type(mgf1md);
         if (!ossl_rsa_pss_params_30_set_defaults(&pss_params)
             || !ossl_rsa_pss_params_30_set_hashalg(&pss_params, md_nid)
             || !ossl_rsa_pss_params_30_set_maskgenhashalg(&pss_params,
@@ -778,7 +774,7 @@ static int rsa_int_export_to(const EVP_PKEY *from, int rsa_type,
         goto err;
 
     /* We export, the provider imports */
-    rv = evp_keymgmt_import(to_keymgmt, to_keydata, selection, params);
+    rv = importer(to_keydata, selection, params);
 
  err:
     OSSL_PARAM_free(params);
@@ -840,7 +836,7 @@ static int rsa_int_import_from(const OSSL_PARAM params[], void *vpctx,
         goto err;
     }
 
-    if (!ossl_rsa_fromdata(rsa, params))
+    if (!ossl_rsa_fromdata(rsa, params, 1))
         goto err;
 
     switch (rsa_type) {
@@ -859,19 +855,19 @@ static int rsa_int_import_from(const OSSL_PARAM params[], void *vpctx,
 }
 
 static int rsa_pkey_export_to(const EVP_PKEY *from, void *to_keydata,
-                              EVP_KEYMGMT *to_keymgmt, OSSL_LIB_CTX *libctx,
-                              const char *propq)
+                              OSSL_FUNC_keymgmt_import_fn *importer,
+                              OSSL_LIB_CTX *libctx, const char *propq)
 {
     return rsa_int_export_to(from, RSA_FLAG_TYPE_RSA, to_keydata,
-                             to_keymgmt, libctx, propq);
+                             importer, libctx, propq);
 }
 
 static int rsa_pss_pkey_export_to(const EVP_PKEY *from, void *to_keydata,
-                                  EVP_KEYMGMT *to_keymgmt, OSSL_LIB_CTX *libctx,
-                                  const char *propq)
+                                  OSSL_FUNC_keymgmt_import_fn *importer,
+                                  OSSL_LIB_CTX *libctx, const char *propq)
 {
     return rsa_int_export_to(from, RSA_FLAG_TYPE_RSASSAPSS, to_keydata,
-                             to_keymgmt, libctx, propq);
+                             importer, libctx, propq);
 }
 
 static int rsa_pkey_import_from(const OSSL_PARAM params[], void *vpctx)

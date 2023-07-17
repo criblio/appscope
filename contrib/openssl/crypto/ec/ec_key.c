@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -19,7 +19,9 @@
 #include "ec_local.h"
 #include "internal/refcount.h"
 #include <openssl/err.h>
-#include <openssl/engine.h>
+#ifndef FIPS_MODULE
+# include <openssl/engine.h>
+#endif
 #include <openssl/self_test.h>
 #include "prov/providercommon.h"
 #include "crypto/bn.h"
@@ -298,7 +300,7 @@ static int ec_generate_key(EC_KEY *eckey, int pairwise_test)
     }
 
     do
-        if (!BN_priv_rand_range_ex(priv_key, order, ctx))
+        if (!BN_priv_rand_range_ex(priv_key, order, 0, ctx))
             goto err;
     while (BN_is_zero(priv_key)) ;
 
@@ -678,6 +680,9 @@ int EC_KEY_set_group(EC_KEY *key, const EC_GROUP *group)
         return 0;
     EC_GROUP_free(key->group);
     key->group = EC_GROUP_dup(group);
+    if (key->group != NULL && EC_GROUP_get_curve_name(key->group) == NID_sm2)
+        EC_KEY_set_flags(key, EC_FLAG_SM2_RANGE);
+
     key->dirty_cnt++;
     return (key->group == NULL) ? 0 : 1;
 }
@@ -714,6 +719,16 @@ int EC_KEY_set_private_key(EC_KEY *key, const BIGNUM *priv_key)
     if (key->meth->set_private != NULL
         && key->meth->set_private(key, priv_key) == 0)
         return 0;
+
+    /*
+     * Return `0` to comply with legacy behavior for this function, see
+     * https://github.com/openssl/openssl/issues/18744#issuecomment-1195175696
+     */
+    if (priv_key == NULL) {
+        BN_clear_free(key->priv_key);
+        key->priv_key = NULL;
+        return 0; /* intentional for legacy compatibility */
+    }
 
     /*
      * We should never leak the bit length of the secret scalar in the key,
@@ -942,8 +957,7 @@ int ossl_ec_key_simple_oct2priv(EC_KEY *eckey, const unsigned char *buf,
         ERR_raise(ERR_LIB_EC, ERR_R_MALLOC_FAILURE);
         return 0;
     }
-    eckey->priv_key = BN_bin2bn(buf, len, eckey->priv_key);
-    if (eckey->priv_key == NULL) {
+    if (BN_bin2bn(buf, len, eckey->priv_key) == NULL) {
         ERR_raise(ERR_LIB_EC, ERR_R_BN_LIB);
         return 0;
     }

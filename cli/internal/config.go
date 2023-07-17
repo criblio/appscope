@@ -27,6 +27,7 @@ func InitConfig() {
 func CreateLogFile(path string, filePerms os.FileMode) {
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	util.CheckErrSprintf(err, "could not create path to log file %s: %v", path, err)
+
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, filePerms)
 	util.CheckErrSprintf(err, "could not open log file %s: %v", path, err)
 	SetLogWriter(f)

@@ -68,7 +68,8 @@ OSSL_CORE_MAKE_FUNC(int,core_get_params,(const OSSL_CORE_HANDLE *prov,
                                          OSSL_PARAM params[]))
 # define OSSL_FUNC_CORE_THREAD_START           3
 OSSL_CORE_MAKE_FUNC(int,core_thread_start,(const OSSL_CORE_HANDLE *prov,
-                                           OSSL_thread_stop_handler_fn handfn))
+                                           OSSL_thread_stop_handler_fn handfn,
+                                           void *arg))
 # define OSSL_FUNC_CORE_GET_LIBCTX             4
 OSSL_CORE_MAKE_FUNC(OPENSSL_CORE_CTX *,core_get_libctx,
                     (const OSSL_CORE_HANDLE *prov))
@@ -89,6 +90,19 @@ OSSL_CORE_MAKE_FUNC(int, core_clear_last_error_mark,
                     (const OSSL_CORE_HANDLE *prov))
 # define OSSL_FUNC_CORE_POP_ERROR_TO_MARK     10
 OSSL_CORE_MAKE_FUNC(int, core_pop_error_to_mark, (const OSSL_CORE_HANDLE *prov))
+
+
+/* Functions to access the OBJ database */
+
+#define OSSL_FUNC_CORE_OBJ_ADD_SIGID          11
+#define OSSL_FUNC_CORE_OBJ_CREATE             12
+
+OSSL_CORE_MAKE_FUNC(int, core_obj_add_sigid,
+                    (const OSSL_CORE_HANDLE *prov, const char  *sign_name,
+                     const char *digest_name, const char *pkey_name))
+OSSL_CORE_MAKE_FUNC(int, core_obj_create,
+                    (const OSSL_CORE_HANDLE *prov, const char *oid,
+                     const char *sn, const char *ln))
 
 /* Memory allocation, freeing, clearing. */
 #define OSSL_FUNC_CRYPTO_MALLOC               20
@@ -182,6 +196,34 @@ OSSL_CORE_MAKE_FUNC(size_t, get_nonce, (const OSSL_CORE_HANDLE *handle,
                                         size_t salt_len))
 OSSL_CORE_MAKE_FUNC(void, cleanup_nonce, (const OSSL_CORE_HANDLE *handle,
                                           unsigned char *buf, size_t len))
+
+/* Functions to access the core's providers */
+#define OSSL_FUNC_PROVIDER_REGISTER_CHILD_CB   105
+#define OSSL_FUNC_PROVIDER_DEREGISTER_CHILD_CB 106
+#define OSSL_FUNC_PROVIDER_NAME                107
+#define OSSL_FUNC_PROVIDER_GET0_PROVIDER_CTX   108
+#define OSSL_FUNC_PROVIDER_GET0_DISPATCH       109
+#define OSSL_FUNC_PROVIDER_UP_REF              110
+#define OSSL_FUNC_PROVIDER_FREE                111
+
+OSSL_CORE_MAKE_FUNC(int, provider_register_child_cb,
+                    (const OSSL_CORE_HANDLE *handle,
+                     int (*create_cb)(const OSSL_CORE_HANDLE *provider, void *cbdata),
+                     int (*remove_cb)(const OSSL_CORE_HANDLE *provider, void *cbdata),
+                     int (*global_props_cb)(const char *props, void *cbdata),
+                     void *cbdata))
+OSSL_CORE_MAKE_FUNC(void, provider_deregister_child_cb,
+                    (const OSSL_CORE_HANDLE *handle))
+OSSL_CORE_MAKE_FUNC(const char *, provider_name,
+                    (const OSSL_CORE_HANDLE *prov))
+OSSL_CORE_MAKE_FUNC(void *, provider_get0_provider_ctx,
+                    (const OSSL_CORE_HANDLE *prov))
+OSSL_CORE_MAKE_FUNC(const OSSL_DISPATCH *, provider_get0_dispatch,
+                    (const OSSL_CORE_HANDLE *prov))
+OSSL_CORE_MAKE_FUNC(int, provider_up_ref,
+                    (const OSSL_CORE_HANDLE *prov, int activate))
+OSSL_CORE_MAKE_FUNC(int, provider_free,
+                    (const OSSL_CORE_HANDLE *prov, int deactivate))
 
 /* Functions provided by the provider to the Core, reserved numbers 1024-1535 */
 # define OSSL_FUNC_PROVIDER_TEARDOWN           1024

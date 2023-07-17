@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -42,12 +42,15 @@ my @files = qw(
                 evpciph_aes_common.txt
                 evpciph_aes_cts.txt
                 evpciph_aes_wrap.txt
+                evpciph_aes_stitched.txt
                 evpciph_des3_common.txt
                 evpkdf_hkdf.txt
+                evpkdf_pbkdf1.txt
                 evpkdf_pbkdf2.txt
                 evpkdf_ss.txt
                 evpkdf_ssh.txt
                 evpkdf_tls12_prf.txt
+                evpkdf_tls13_kdf.txt
                 evpkdf_x942.txt
                 evpkdf_x963.txt
                 evpmac_common.txt
@@ -83,12 +86,14 @@ my @defltfiles = qw(
                      evpciph_aria.txt 
                      evpciph_bf.txt
                      evpciph_camellia.txt
+                     evpciph_camellia_cts.txt
                      evpciph_cast5.txt
                      evpciph_chacha.txt
                      evpciph_des.txt
                      evpciph_idea.txt
                      evpciph_rc2.txt
                      evpciph_rc4.txt
+                     evpciph_rc4_stitched.txt
                      evpciph_rc5.txt
                      evpciph_seed.txt
                      evpciph_sm4.txt
@@ -99,6 +104,7 @@ my @defltfiles = qw(
                      evpmac_blake.txt
                      evpmac_poly1305.txt
                      evpmac_siphash.txt
+                     evpmac_sm3.txt
                      evpmd_blake.txt
                      evpmd_md.txt
                      evpmd_mdc2.txt

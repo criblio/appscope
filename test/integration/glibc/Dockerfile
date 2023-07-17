@@ -15,6 +15,12 @@ RUN gcc -o /opt/errno_test/errno_test /opt/errno_test/hello_errno.c
 COPY ./glibc/hello_fault.c /opt/fault_test/hello_fault.c
 RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
 
+RUN mkdir -p /opt/sig_test
+COPY ./glibc/sighandler.c /opt/sig_test/sighandler.c
+RUN gcc -g -o /opt/sig_test/sighandler /opt/sig_test/sighandler.c
+COPY ./glibc/sigusrhandler.c /opt/sig_test/sigusrhandler.c
+RUN gcc -g -o /opt/sig_test/sigusrhandler /opt/sig_test/sigusrhandler.c -lrt
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 
@@ -39,7 +45,6 @@ RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/lib && \
      mkdir -p /opt/test-runner/logs/ && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY glibc/scope-test /usr/local/scope/scope-test

@@ -155,14 +155,15 @@
         OPT_S__FIRST=3000, \
         OPT_S_NOSSL3, OPT_S_NOTLS1, OPT_S_NOTLS1_1, OPT_S_NOTLS1_2, \
         OPT_S_NOTLS1_3, OPT_S_BUGS, OPT_S_NO_COMP, OPT_S_NOTICKET, \
-        OPT_S_SERVERPREF, OPT_S_LEGACYRENEG, OPT_S_LEGACYCONN, \
+        OPT_S_SERVERPREF, OPT_S_LEGACYRENEG, OPT_S_CLIENTRENEG, \
+        OPT_S_LEGACYCONN, \
         OPT_S_ONRESUMP, OPT_S_NOLEGACYCONN, OPT_S_ALLOW_NO_DHE_KEX, \
         OPT_S_PRIORITIZE_CHACHA, \
         OPT_S_STRICT, OPT_S_SIGALGS, OPT_S_CLIENTSIGALGS, OPT_S_GROUPS, \
         OPT_S_CURVES, OPT_S_NAMEDCURVE, OPT_S_CIPHER, OPT_S_CIPHERSUITES, \
         OPT_S_RECORD_PADDING, OPT_S_DEBUGBROKE, OPT_S_COMP, \
         OPT_S_MINPROTO, OPT_S_MAXPROTO, \
-        OPT_S_NO_RENEGOTIATION, OPT_S_NO_MIDDLEBOX, OPT_S__LAST
+        OPT_S_NO_RENEGOTIATION, OPT_S_NO_MIDDLEBOX, OPT_S_NO_ETM, OPT_S__LAST
 
 # define OPT_S_OPTIONS \
         OPT_SECTION("TLS/SSL"), \
@@ -179,6 +180,8 @@
         {"serverpref", OPT_S_SERVERPREF, '-', "Use server's cipher preferences"}, \
         {"legacy_renegotiation", OPT_S_LEGACYRENEG, '-', \
             "Enable use of legacy renegotiation (dangerous)"}, \
+        {"client_renegotiation", OPT_S_CLIENTRENEG, '-', \
+            "Allow client-initiated renegotiation" }, \
         {"no_renegotiation", OPT_S_NO_RENEGOTIATION, '-', \
             "Disable all renegotiation."}, \
         {"legacy_server_connect", OPT_S_LEGACYCONN, '-', \
@@ -213,7 +216,9 @@
         {"debug_broken_protocol", OPT_S_DEBUGBROKE, '-', \
             "Perform all sorts of protocol violations for testing purposes"}, \
         {"no_middlebox", OPT_S_NO_MIDDLEBOX, '-', \
-            "Disable TLSv1.3 middlebox compat mode" }
+            "Disable TLSv1.3 middlebox compat mode" }, \
+        {"no_etm", OPT_S_NO_ETM, '-', \
+            "Disable Encrypt-then-Mac extension"}
 
 # define OPT_S_CASES \
         OPT_S__FIRST: case OPT_S__LAST: break; \
@@ -228,6 +233,7 @@
         case OPT_S_NOTICKET: \
         case OPT_S_SERVERPREF: \
         case OPT_S_LEGACYRENEG: \
+        case OPT_S_CLIENTRENEG: \
         case OPT_S_LEGACYCONN: \
         case OPT_S_ONRESUMP: \
         case OPT_S_NOLEGACYCONN: \
@@ -246,7 +252,8 @@
         case OPT_S_MINPROTO: \
         case OPT_S_MAXPROTO: \
         case OPT_S_DEBUGBROKE: \
-        case OPT_S_NO_MIDDLEBOX
+        case OPT_S_NO_MIDDLEBOX: \
+        case OPT_S_NO_ETM
 
 #define IS_NO_PROT_FLAG(o) \
  (o == OPT_S_NOSSL3 || o == OPT_S_NOTLS1 || o == OPT_S_NOTLS1_1 \
@@ -310,6 +317,9 @@ typedef struct options_st {
     int valtype;
     const char *helpstr;
 } OPTIONS;
+/* Special retval values: */
+#define OPT_PARAM 0 /* same as OPT_EOF usually defined in apps */
+#define OPT_DUP -2 /* marks duplicate occurrence of option in help output */
 
 /*
  * A string/int pairing; widely use for option value lookup, hence the
@@ -356,6 +366,7 @@ char *opt_flag(void);
 char *opt_arg(void);
 char *opt_unknown(void);
 int opt_cipher(const char *name, EVP_CIPHER **cipherp);
+int opt_cipher_any(const char *name, EVP_CIPHER **cipherp);
 int opt_cipher_silent(const char *name, EVP_CIPHER **cipherp);
 int opt_md(const char *name, EVP_MD **mdp);
 int opt_md_silent(const char *name, EVP_MD **mdp);
@@ -364,17 +375,8 @@ int opt_int(const char *arg, int *result);
 int opt_int_arg(void);
 int opt_long(const char *arg, long *result);
 int opt_ulong(const char *arg, unsigned long *result);
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L && \
-    defined(INTMAX_MAX) && defined(UINTMAX_MAX) && \
-    !defined(OPENSSL_NO_INTTYPES_H)
-int opt_intmax(const char *arg, intmax_t *result);
-int opt_uintmax(const char *arg, uintmax_t *result);
-#else
-# define opt_intmax opt_long
-# define opt_uintmax opt_ulong
-# define intmax_t long
-# define uintmax_t unsigned long
-#endif
+int opt_intmax(const char *arg, ossl_intmax_t *result);
+int opt_uintmax(const char *arg, ossl_uintmax_t *result);
 
 int opt_isdir(const char *name);
 int opt_format(const char *s, unsigned long flags, int *result);
@@ -386,8 +388,13 @@ int opt_pair(const char *arg, const OPT_PAIR * pairs, int *result);
 int opt_verify(int i, X509_VERIFY_PARAM *vpm);
 int opt_rand(int i);
 int opt_provider(int i);
+int opt_provider_option_given(void);
 
 char **opt_rest(void);
 int opt_num_rest(void);
+
+/* Returns non-zero if legacy paths are still available */
+int opt_legacy_okay(void);
+
 
 #endif /* OSSL_APPS_OPT_H */

@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
+        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
         </p>
         <p>
           One of the greatest features of Splunk is that it allows us lookup data in other, tabular sources, and enrich our log data. Some great examples include things like getting a location for an IP Address (GeoIP), looking up a user in a directory, or bringing more information about a host from an asset management system. One particular downside of lookups in Splunk, however, is that they can be very slow, especially if you're looking up data in an external system. They are also repeated every time a user runs a search. <b>Lastly, because they are at search time, the data is likely to have changed between when the event was emitted and when the lookup is done.</b>

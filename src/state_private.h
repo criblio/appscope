@@ -98,14 +98,9 @@ typedef struct http_post_t {
 typedef struct http_map_t {
     time_t first_time;
     uint64_t start_time;
-    uint64_t duration;
     uint64_t id;
     char *req;          // The whole original request
     size_t req_len;
-    char *method_str;   //   Method field from Request-Line
-    char *target_str;   //   Request-URI field from Request-Line
-    size_t clen;        //   Content-Length entity-header value from req
-    char *resp;         // The whole original response
 } http_map;
 
 typedef struct stat_err_info_t {
@@ -191,7 +186,6 @@ typedef struct net_info_t {
     int active;
     int type;
     http_state_t http[HTTP_NUM];  // rx=[0] and tx=[1]
-    bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;
     bool addrSetUnix;

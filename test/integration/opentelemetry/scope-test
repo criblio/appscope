@@ -1,0 +1,62 @@
+#! /bin/bash
+
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+}
+
+#
+# currencyservice
+#
+
+starttest currencyservice
+
+/usr/local/scope/bin/scope extract /usr/local/scope/lib
+
+LD_PRELOAD=/usr/local/scope/lib/libscope.so /opt/telemetry-demo/src/currencyservice/build/currencyservice
+
+if [ $? = 0 ]; then
+    echo "CurrencyService finish with success."
+else
+    ERR=1
+fi
+
+endtest
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

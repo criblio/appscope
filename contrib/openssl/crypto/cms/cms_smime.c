@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2008-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -48,7 +48,7 @@ static int cms_copy_content(BIO *out, BIO *in, unsigned int flags)
         i = BIO_read(in, buf, sizeof(buf));
         if (i <= 0) {
             if (BIO_method_type(in) == BIO_TYPE_CIPHER) {
-                if (!BIO_get_cipher_status(in))
+                if (BIO_get_cipher_status(in) <= 0)
                     goto err;
             }
             if (i < 0)
@@ -432,7 +432,8 @@ int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
          * Don't use SMIME_TEXT for verify: it adds headers and we want to
          * remove them.
          */
-        SMIME_crlf_copy(dcont, cmsbio, flags & ~SMIME_TEXT);
+        if (!SMIME_crlf_copy(dcont, cmsbio, flags & ~SMIME_TEXT))
+            goto err;
 
         if (flags & CMS_TEXT) {
             if (!SMIME_text(tmpout, out)) {
@@ -608,6 +609,8 @@ CMS_ContentInfo *CMS_sign_receipt(CMS_SignerInfo *si,
 
     /* Set embedded content */
     pos = CMS_get0_content(cms);
+    if (pos == NULL)
+        goto err;
     *pos = os;
 
     r = 1;
@@ -630,7 +633,7 @@ CMS_ContentInfo *CMS_encrypt_ex(STACK_OF(X509) *certs, BIO *data,
     X509 *recip;
 
 
-    cms = (EVP_CIPHER_flags(cipher) & EVP_CIPH_FLAG_AEAD_CIPHER)
+    cms = (EVP_CIPHER_get_flags(cipher) & EVP_CIPH_FLAG_AEAD_CIPHER)
           ? CMS_AuthEnvelopedData_create_ex(cipher, libctx, propq)
           : CMS_EnvelopedData_create_ex(cipher, libctx, propq);
     if (cms == NULL)
@@ -880,7 +883,9 @@ int CMS_final(CMS_ContentInfo *cms, BIO *data, BIO *dcont, unsigned int flags)
         return 0;
     }
 
-    ret = SMIME_crlf_copy(data, cmsbio, flags);
+    if (!SMIME_crlf_copy(data, cmsbio, flags)) {
+        goto err;
+    }
 
     (void)BIO_flush(cmsbio);
 
@@ -888,6 +893,9 @@ int CMS_final(CMS_ContentInfo *cms, BIO *data, BIO *dcont, unsigned int flags)
         ERR_raise(ERR_LIB_CMS, CMS_R_CMS_DATAFINAL_ERROR);
         goto err;
     }
+
+    ret = 1;
+
 err:
     do_free_upto(cmsbio, dcont);
 

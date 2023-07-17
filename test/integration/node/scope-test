@@ -1,0 +1,210 @@
+#!/bin/bash
+DEBUG=0  # set this to 1 to capture the OUTFILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+OUTFILE=/usr/local/scope/metric.out
+EVT_FILE=/usr/local/scope/events.out
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==================================="
+    echo "       Testing $CURRENT_TEST       "
+    echo "==================================="
+    ERR=0
+}
+
+evaltest(){
+    local appName=$1
+    if [ $? -ne 0 ]; then
+        echo "It appears that node $appName crashed."
+        ERR+=1
+    fi
+    echo "       Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******* $CURRENT_TEST $RESULT *********"
+    echo ""
+    echo ""
+
+    #copy the OUTFILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp -f $OUTFILE $OUTFILE.$CURRENT_TEST
+    fi
+
+    rm -f $EVT_FILE
+    rm -f $OUTFILE
+}
+
+# Check expected property of http communication
+http_msg_property_check() {
+    local http_param=$1
+    count=$(grep '"sourcetype":"http"' $EVT_FILE | grep -c $http_param)
+    if [ $count -ne 2 ]; then
+        echo "http_msg_property_check failed, params: $http_param"
+        ERR+=1
+    fi
+}
+
+cd /usr/local/scope
+# extract the libscope.so
+/usr/local/scope/bin/scope extract /usr/local/scope/lib
+
+starttest "metric format on_by_default"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+COUNT=`grep -c "^my\." $OUTFILE`
+if [ $COUNT != "6" ]; then
+    echo "expected 6 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
+    ERR+=1
+fi
+endtest
+
+starttest "metric format captured_dimensions_exist"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "source:hot-shots"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+endtest
+
+starttest "metric format custom_dimensions_exist"
+SCOPE_TAG_customtag=customvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "customtag:customvalue"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+endtest
+
+starttest "metric format builtin_dimensions_exist"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in pid host proc; do
+    if echo $METRIC | grep $DIM; then
+        echo "as expected, found $DIM"
+    else
+        ERR+=1
+    fi
+done
+endtest
+
+
+# Desired "default" dimension priority.  This describes what we want
+# when a field name is common across multiple sources (which source
+# wins).
+#   (1) captured_dimension
+#   (2) custom_dimension
+#   (3) builtin_dimension
+
+# test (1) vs (2) with conflicting "source"
+starttest "metric format captured_tag_priority"
+SCOPE_TAG_source=conflictvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "source:hot-shots"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+for DIM in "source:conflictvalue"; do
+   if echo $METRIC | grep $DIM; then
+       ERR+=1
+       echo "did not expect $DIM to exist"
+   fi
+done
+endtest
+
+# test (2) vs (3) with conflicting "proc"
+starttest "metric format custom_tag_priority"
+SCOPE_TAG_proc=myprocval LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest hotshot.ts
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "proc:myprocval"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+for DIM in "proc:node"; do
+   if echo $METRIC | grep $DIM; then
+       ERR+=1
+       echo "did not expect $DIM to exist"
+   fi
+done
+endtest
+
+
+starttest "metric format can_be_disabled"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE SCOPE_METRIC_STATSD=false node hotshot.ts
+evaltest hotshot.ts
+COUNT=`grep -c "^my\." $OUTFILE`
+if [ $COUNT != "0" ]; then
+    echo "expected 0 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
+    ERR+=1
+fi
+endtest
+
+starttest "https communication "
+# Start server
+node server.js &
+server_pid=$!
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_EVENT_DEST=file://$EVT_FILE node client.js
+evaltest client.js
+
+http_msg_property_check 'net_host_ip'
+http_msg_property_check 'net_host_port'
+http_msg_property_check 'net_peer_ip'
+http_msg_property_check 'net_peer_port'
+http_msg_property_check 'net_transport'
+http_msg_property_check '"http_scheme":"https"'
+
+# Cleanup
+kill -s SIGTERM $server_pid
+endtest
+
+###########################################################################
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $OUTFILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

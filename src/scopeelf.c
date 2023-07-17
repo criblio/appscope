@@ -10,6 +10,11 @@
 #include "os.h"
 #include "fn.h"
 #include "scopeelf.h"
+#include "utils.h"
+
+/*******************************************************************************
+ * Consider updating src/loader/loaderutils.c if you make changes to this file *
+ *******************************************************************************/
 
 void
 freeElf(char *buf, size_t len)
@@ -103,7 +108,7 @@ getElf(char *path)
         goto out;
     }
 
-    if ((fd = scope_open(path, O_RDONLY)) == -1) {
+    if (((fd = scope_open(path, O_RDONLY)) == -1) && ((fd = osFindFd(scope_getpid(), path)) == -1)) {
         scopeLogError("getElf: open failed");
         goto out;
     }
@@ -112,7 +117,6 @@ getElf(char *path)
         scopeLogError("fd:%d getElf: fstat failed", fd);
         goto out;
     }
-
 
     char * mmap_rv = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
@@ -162,9 +166,10 @@ out:
  * The relocation table's entries have a one-to-one correspondence with the PLT.
  */
 int
-doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
+doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, bool attach)
 {
     int i, match = -1;
+    uint64_t prev;
 
     for (i = 0; i < rsz / sizeof(Elf64_Rela); i++) {
         /*
@@ -180,9 +185,15 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
          * According to the ELF spec there is no size/number of entries for the
          * symbol table at the program header table level. This is not needed at
          * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
+         *
+         * Locating and dereferencing the GOT can be confusing, for reference:
+         * What symbol is defined in this GOT entry
+         * .rel.plt -> r.info -> .dynsym -> st_name -> .dynstr -> read\0
+         *
+         * If this is a symbol we want to interpose, then:
+         * .rel.plt -> r.offset + load address -> GOT entry for read
          */
         if (!scope_strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
-            uint64_t *gfn = hook->gfn;
             uint64_t *gaddr = (uint64_t *)(rel[i].r_offset + lm->l_addr);
             int page_size = scope_getpagesize();
             size_t saddr = ROUND_DOWN((size_t)gaddr, page_size);
@@ -190,9 +201,9 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
 
             if (prot != -1) {
                 if ((prot & PROT_WRITE) == 0) {
-                    // mprotect if write perms are not set
-                    if (scope_mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
-                        scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
+                    // allow for write permission it write permission are not set
+                    if (osMemPermAllow((void *)saddr, 16, prot, PROT_WRITE) == FALSE) {
+                        scopeLog(CFG_LOG_DEBUG, "doGotcha: osMemPermAllow add write protection flag failed");
                         return -1;
                     }
                 }
@@ -213,16 +224,23 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            if (!attach) *gfn = *gaddr;
-            uint64_t prev = *gaddr;
-            *gaddr = (uint64_t)hook->func;
+            prev = *gaddr;
+            if (attach == TRUE) {
+                // been here before, don't update the GOT entry
+                if ((void *)*gaddr == hook->func) return -1;
+                *gaddr = (uint64_t)hook->func;
+            } else {
+                // handle a detach operation
+                *gaddr = *(uint64_t *)hook->gfn;
+            }
+
             scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
                         __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is
-                if (scope_mprotect((void *)saddr, (size_t)16, prot) == -1) {
-                    scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
+                if (osMemPermRestore((void *)saddr, 16, prot) == FALSE) {
+                    scopeLog(CFG_LOG_DEBUG, "doGotcha: osMemPermRestore remove write memory protection flags failed");
                     return -1;
                 }
             }
@@ -281,6 +299,56 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
     }
 
     return 0;
+}
+
+void *
+getDynSymbol(const char *buf, char *sname)
+{
+    int i, nsyms = 0;
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    Elf64_Sym *symtab = NULL;
+    const char *section_strtab = NULL;
+    const char *strtab = NULL;
+    const char *sec_name = NULL;
+
+    if (!buf || !sname) return NULL;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+
+        if (sections[i].sh_type == SHT_DYNSYM) {
+            symtab = (Elf64_Sym *)((char *)buf + sections[i].sh_offset);
+            nsyms = sections[i].sh_size / sections[i].sh_entsize;
+        } else if (sections[i].sh_type == SHT_STRTAB && scope_strcmp(sec_name, ".dynstr") == 0) {
+            strtab = (const char *)(buf + sections[i].sh_offset);
+        }
+
+        if ((strtab != NULL) && (symtab != NULL)) break;
+        scopeLogDebug("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
+                      sec_name,
+                      sections[i].sh_type,
+                      sections[i].sh_flags,
+                      sections[i].sh_addr,
+                      sections[i].sh_addr + sections[i].sh_size,
+                      sections[i].sh_size,
+                      sections[i].sh_offset);
+    }
+
+    for (i=0; i < nsyms; i++) {
+        if (scope_strcmp(sname, strtab + symtab[i].st_name) == 0) {
+            symaddr = symtab[i].st_value;
+            sysprint("symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
+            break;
+        }
+    }
+
+    return (void *)symaddr;
 }
 
 void *
@@ -389,3 +457,4 @@ is_musl(char *buf)
 
     return FALSE;
 }
+

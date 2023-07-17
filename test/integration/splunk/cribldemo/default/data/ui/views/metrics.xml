@@ -41,7 +41,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="logs_to_metrics" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Logs To Metrics</a></span> 
+        background-color: #1890FF"><a href="" id="logs_to_metrics" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Logs To Metrics</a></span> 
         </p>
         <p>
           <b>Cribl allows for taking any incoming log sources and converting them to precise metrics.</b>In this example, we're looking at plain old Apache access logs and converting a few of the fields into metrics. Specifically, we're making these two fields into metric values: <code>timeTaken</code>, <code>bytes</code>, and attaching the following as dimensions: 

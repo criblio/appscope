@@ -1,0 +1,28 @@
+FROM node:19-alpine3.16
+
+RUN mkdir -p /usr/local/scope/lib && \
+    mkdir -p /usr/local/scope/bin
+
+WORKDIR /usr/local/scope/
+
+RUN apk add bash curl openssl
+
+RUN npm install hot-shots
+
+COPY node/scope-test /usr/local/scope/
+COPY node/hotshot.ts /usr/local/scope/
+COPY node/client.js /usr/local/scope/
+COPY node/server.js /usr/local/scope/
+
+ENV SCOPE_CRIBL_ENABLE=false
+
+RUN cd /usr/local/scope && \
+    openssl genpkey -algorithm RSA -out key.pem && \
+    openssl req -new -key key.pem -out csr.pem -subj "/CN=example.com" && \
+    openssl x509 -req -days 365 -in csr.pem -signkey key.pem -out cert.pem
+
+RUN ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope
+
+COPY docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]

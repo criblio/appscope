@@ -1,0 +1,25 @@
+allow:
+- arg: redis
+  config:
+    cribl:
+      enable: false
+    libscope:
+      log:
+        level: error
+        transport:
+          buffer: line
+          path: /tmp/redis.log
+          type: file
+- procname: htop
+  config:
+    cribl:
+      enable: true
+    libscope:
+      log:
+        level: info
+        transport:
+          buffer: line
+          path: /tmp/htop.log
+          type: file
+deny:
+- arg: git

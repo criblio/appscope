@@ -3,8 +3,10 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"math/rand"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
+	"github.com/rs/zerolog/log"
 )
 
 type ReadSeekCloser interface {
@@ -80,6 +83,17 @@ func ErrAndExit(format string, a ...interface{}) {
 	}
 	os.Stderr.WriteString(out)
 	os.Exit(1)
+}
+
+// Warn writes a format string to stderr
+func Warn(format string, a ...interface{}) {
+	out := fmt.Sprintf(format, a...)
+	if len(out) > 0 {
+		if out[len(out)-1:] != "\n" {
+			out += "\n"
+		}
+	}
+	os.Stderr.WriteString(out)
 }
 
 // CheckFileExists checks if a file exists on the filesystem
@@ -330,4 +344,144 @@ func InterfaceToString(i interface{}) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// Confirm allows a user to confirm y/n with stdin
+func Confirm(s string) bool {
+	fmt.Printf("%s [y/n]: ", s)
+
+	var in string
+	_, err := fmt.Scan(&in)
+	CheckErrSprintf(err, "error: confirm failed; %v", err)
+
+	in = strings.TrimSpace(in)
+	in = strings.ToLower(in)
+
+	if in == "y" || in == "yes" {
+		return true
+	}
+
+	return false
+}
+
+// CopyFile copies a file from a source to a destination with specific permissions
+func CopyFile(src, dst string, mode fs.FileMode) (int64, error) {
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer destination.Close()
+
+	if err := os.Chmod(dst, mode); err != nil {
+		return 0, err
+	}
+
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
+}
+
+// CopyFile copies a file from a source to a destination with original permissions
+func CopyFile2(src, dst string) (int64, error) {
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() {
+		c := destination.Close()
+		if c != nil && err == nil {
+			err = c
+		}
+	}()
+
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
+}
+
+func RemoveEmptyStrings(s []string) []string {
+	var ret []string
+	for _, str := range s {
+		if str != "" {
+			ret = append(ret, str)
+		}
+	}
+	return ret
+}
+
+// GetContainersPids gets the list of PID(s) related to containers
+func GetContainersPids() []int {
+	cPids := []int{}
+
+	ctrDPids, err := GetContainerDPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover ContainerD containers failed.")
+	}
+	if ctrDPids != nil {
+		cPids = append(cPids, ctrDPids...)
+	}
+
+	podmanPids, err := GetPodmanPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
+	}
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
+	}
+
+	lxcPids, err := GetLXCPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrLXDSocketNotAvailable):
+			log.Warn().
+				Msgf("Discover LXC containers skipped. LXD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover LXC containers failed.")
+		}
+	}
+	if lxcPids != nil {
+		cPids = append(cPids, lxcPids...)
+	}
+
+	return cPids
+}
+
+// Extract extracts scope to the scope version directory
+func Extract(scopeDirVersion string) error {
+	// Copy scope
+	perms := os.FileMode(0755)
+	exPath, err := os.Executable()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error getting executable path")
+		return err
+	}
+	if _, err := CopyFile(exPath, filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
+		if err != os.ErrExist {
+			log.Error().
+				Err(err).
+				Msgf("Error writing scope to %s.", scopeDirVersion)
+			return err
+		}
+	}
+
+	return nil
 }

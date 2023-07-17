@@ -1,7 +1,7 @@
 #! /bin/bash
 
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
-
+ARCH=`uname -m`
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
@@ -50,6 +50,15 @@ endtest(){
     rm -f $LOG_FILE
 }
 
+is_file() {
+    if [ ! -f "$1" ] ; then
+        echo "FAIL: File $1 does not exist"
+        ERR+=1
+    else
+	echo "PASS: File exists"
+    fi
+}
+
 export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
@@ -89,10 +98,10 @@ evalPayload(){
 starttest syscalls_unlinkat
 cd /go/syscalls
 
-ldscope ./unlinkat
+scope -z ./unlinkat
 
 evaltest
-
+sleep 1
 grep unlinkat $EVT_FILE | grep fs.delete > /dev/null
 ERR+=$?
 
@@ -104,7 +113,7 @@ endtest
 starttest opfalse
 cd /go/syscalls
 
-ldscope ./opfalse
+scope -z ./opfalse
 
 evaltest
 
@@ -126,7 +135,7 @@ endtest
 starttest syscalls_readdir
 cd /go/syscalls
 
-ldscope ./readdir
+scope -z ./readdir
 
 evaltest
 
@@ -144,7 +153,7 @@ starttest plainServerDynamic
 cd /go/net
 PORT=80
 
-ldscope ./plainServerDynamic ${PORT} &
+scope -z ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -193,9 +202,9 @@ endtest
 #
 starttest plainServerDynamicPie
 cd /go/net
-PORT=80
+PORT=81
 
-ldscope ./plainServerDynamicPie ${PORT} &
+scope -z ./plainServerDynamicPie ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -239,13 +248,45 @@ ERR+=$?
 endtest
 
 
+# Commented out for now, unable to repro test failures only seen in CI
+##
+## scope snapshot (same namespace)
+##
+#starttest "scope_snapshot"
+#cd /go/net
+#PORT=82
+#
+#scope run --backtrace -- ./plainServerStatic ${PORT} &
+#sleep 2
+#psd_pid=`pidof scopedyn`
+#
+#kill -s SIGFPE $psd_pid
+#sleep 2
+#
+#scope snapshot $psd_pid
+#sleep 2
+#
+#evaltest
+#
+#is_file /tmp/appscope/${psd_pid}/snapshot
+#is_file /tmp/appscope/${psd_pid}/info
+## is_file /tmp/appscope/${psd_pid}/core
+#is_file /tmp/appscope/${psd_pid}/cfg
+#is_file /tmp/appscope/${psd_pid}/backtrace
+#
+## Kill psd process
+#kill $psd_pid
+#
+#endtest
+
+
 #
 # plainServerStatic
 #
 starttest plainServerStatic
 cd /go/net
-PORT=81
-ldscope ./plainServerStatic ${PORT} &
+PORT=83
+scope -z ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -295,7 +336,7 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-ldscope ./tlsServerDynamic ${PORT} &
+scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -346,7 +387,7 @@ starttest tlsServerStatic
 cd /go/net
 PORT=4431
 STRUCT_PATH=/go/net/go_offsets.txt
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsServerStatic ${PORT} &
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope -z ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -394,7 +435,7 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-ldscope ./plainClientDynamic
+scope -z ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
@@ -435,7 +476,7 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-ldscope ./plainClientStatic
+scope -z ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
@@ -476,7 +517,7 @@ endtest
 #
 starttest plainClientStaticStripped
 cd /go/net
-ldscope ./plainClientStaticStripped
+scope -z ./plainClientStaticStripped
 ERR+=$?
 
 # this sleep gives plainClientStaticStripped a chance to report its events on exit
@@ -523,7 +564,7 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-ldscope ./tlsClientDynamic
+scope -z ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -564,7 +605,7 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope -z ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
@@ -605,7 +646,7 @@ endtest
 #
 starttest tlsClientDynamicHTTP1
 cd /go/net
-GODEBUG=http2client=0,http2server=0 ldscope ./tlsClientDynamic
+GODEBUG=http2client=0,http2server=0 scope -z ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -646,8 +687,8 @@ endtest
 #
 starttest tlsServerDynamicHTTP1
 cd /go/net
-PORT=4430
-GODEBUG=http2client=0,http2server=0 ldscope ./tlsServerDynamic ${PORT} &
+PORT=4433
+GODEBUG=http2client=0,http2server=0 scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -726,7 +767,7 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-ldscope ./fileThread
+scope -z ./fileThread
 ERR+=$?
 evaltest
 
@@ -744,7 +785,7 @@ endtest
 #
 starttest signalHandlerDynamic
 cd /go/signals
-ldscope ./signalHandlerDynamic 2>${ERR_FILE}&
+scope -z ./signalHandlerDynamic 2>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
 
@@ -774,26 +815,37 @@ endtest
 #
 starttest signalHandlerStatic
 cd /go/signals
-ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStatic &>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
+sleep 0.1
 
+kill -SIGCHLD ${SCOPE_PID}
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStatic"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE before sigkill"
+    cat $ERR_FILE
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID}; do
+  echo "sending SIGKILL"
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE after sigkill"
+    cat $ERR_FILE
     ERR+=1
 fi
 
@@ -804,26 +856,37 @@ endtest
 #
 starttest signalHandlerStaticStripped
 cd /go/signals
-ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStaticStripped &>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
+sleep 0.1
 
+kill -SIGCHLD ${SCOPE_PID}
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStaticStripped"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE before sigkill"
+    cat $ERR_FILE
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID}; do
+  echo "sending SIGKILL"
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE after sigkill"
+    cat $ERR_FILE
     ERR+=1
 fi
 
@@ -834,7 +897,7 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. ldscope ./cgoDynamic
+LD_LIBRARY_PATH=. scope -z ./cgoDynamic
 ERR+=$?
 evaltest
 
@@ -852,7 +915,7 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-ldscope ./cgoStatic
+scope -z ./cgoStatic
 ERR+=$?
 evaltest
 
@@ -867,6 +930,7 @@ endtest
 #
 #  influxdb tests
 #
+if [ $ARCH != "aarch64" ]; then
 dbfile="/go/influx/db/meta/meta.db"
 influx_verbose=0
 
@@ -874,9 +938,9 @@ influx_start_server() {
     rm -f /go/influx/db/*.event
 
     if (( $influx_verbose )); then
-        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event ldscope $1 &
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope -z $1 &
     else
-        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event ldscope $1 2>/dev/null &
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope -z $1 2>/dev/null &
     fi
 
     until test -e "$dbfile" ; do
@@ -946,10 +1010,11 @@ unset SCOPE_PAYLOAD_ENABLE
 starttest influx_static_stress
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
+sleep 3
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/stress_test insert -n 1000000 -f
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/stress_test insert -n 1000000 -f
 
-influx_eval 50 ldscope
+influx_eval 50 scope
 
 unset SCOPE_HTTP_SERIALIZE_ENABLE
 export SCOPE_PAYLOAD_ENABLE=true
@@ -963,16 +1028,16 @@ starttest influx_static_tls
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb_ssl.conf"
 
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
 if (test $influx_verbose -eq 0); then
     sleep 1
 fi
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
-influx_eval 2 ldscope
+influx_eval 2 scope
 
 
 #
@@ -983,8 +1048,8 @@ starttest influx_dynamic_tls
 
 influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb_ssl.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 influxd
 
@@ -996,10 +1061,10 @@ starttest influx_static_clear
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
 
-influx_eval 2 ldscope
+influx_eval 2 scope
 
 
 #
@@ -1010,21 +1075,24 @@ starttest influx_dynamic_clear
 
 influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'CREATE DATABASE sheep'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
 
 if (test $influx_verbose -eq 0); then
     sleep 1
 fi
 
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -import -path=/go/influx/data.txt -precision=s
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 influxd
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER
+
+# endif for aarch64
+fi
 
 #
 # Done: print results

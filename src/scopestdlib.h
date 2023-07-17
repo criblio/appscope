@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <mqueue.h>
 #include <netdb.h>
 #include <poll.h>
 #include <pthread.h>
@@ -27,6 +28,22 @@
 #include <time.h>
 #include <unistd.h>
 
+/*
+* Following macro is commonly used in several places
+* Note: If the set of common used macro used will grow
+* please consider moving these macros to separate file
+*/
+
+/*
+* Size of array
+*/
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+
+/*
+* Constant String length
+*/ 
+#define C_STRLEN(a)  (sizeof(a) - 1)
+
 extern int  scopelibc_fcntl(int, int, ... /* arg */);
 extern int  scopelibc_open(const char *, int, ...);
 extern long scopelibc_syscall(long, ...);
@@ -35,8 +52,10 @@ extern int  scopelibc_dprintf(int, const char *, ...);
 extern int  scopelibc_fprintf(FILE *, const char *, ...);
 extern int  scopelibc_snprintf(char *, size_t, const char *, ...);
 extern int  scopelibc_sscanf(const char *, const char *, ...);
+extern int  scopelibc_fscanf(FILE *, const char *, ...);
 extern int  scopelibc_sprintf(char *, const char *, ...);
 extern int  scopelibc_asprintf(char **, const char *, ...);
+extern int  scopelibc_mq_open(const char *, int, ...);
 extern int  scopelibc_errno_val;
 extern FILE scopelibc___stdin_FILE;
 extern FILE scopelibc___stdout_FILE;
@@ -52,13 +71,34 @@ extern int32_t ** scopelibc___ctype_tolower_loc(void);
 #define scope_fprintf  scopelibc_fprintf
 #define scope_snprintf scopelibc_snprintf
 #define scope_sscanf   scopelibc_sscanf
+#define scope_fscanf   scopelibc_fscanf
 #define scope_sprintf  scopelibc_sprintf
 #define scope_asprintf scopelibc_asprintf
+#define scope_mq_open  scopelibc_mq_open
 #define scope_errno    scopelibc_errno_val
 #define scope_stdin    (&scopelibc___stdin_FILE)
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+/*
+ * Notes on the use of errno.
+ * There are 2 errno values; errno and scope_errno.
+ *
+ * errno is set by the application. It should be
+ * used, for the most part, by interposed functions where
+ * results of application behavior needs to be checked. It
+ * should only ever be set by libscope in specific cases.
+ *
+ * scope_errno is used by the internal libc.
+ * This value is not thread specific, thread safe, as we avoid the
+ * use of the %fs register and TLS behavior with the internal libc.
+ *
+ * Use scope_errno only for functions called from the periodic
+ * thread, during libscope constructor, or from scope.
+ *
+ * Other functions, primarily those called from interposed functions, can
+ * not safely reference scope_errno.
+ */
 // Other
 extern void scopeSetGoAppStateStatic(int);
 extern int scopeGetGoAppStateStatic(void);
@@ -86,6 +126,7 @@ void* scope_memcpy(void *, const void *, size_t);
 int   scope_mlock(const void *, size_t);
 int   scope_msync(void *, size_t, int);
 int   scope_mincore(void *, size_t, unsigned char *);
+int   scope_memfd_create(const char *, unsigned int);
 
 // File handling operations
 FILE*          scope_fopen(const char *, const char *);
@@ -109,6 +150,7 @@ int            scope_access(const char *, int);
 FILE*          scope_fmemopen(void *, size_t, const char *);
 long           scope_ftell(FILE *);
 int            scope_fseek(FILE *, long, int);
+off_t          scope_lseek(int, off_t, int);
 int            scope_unlink(const char *);
 int            scope_dup2(int, int);
 char*          scope_basename(char *);
@@ -154,19 +196,20 @@ int                scope_vprintf(const char *, va_list);
 int                scope_strcmp(const char *, const char *);
 int                scope_strncmp(const char *, const char *, size_t);
 int                scope_strcasecmp(const char *, const char *);
-char*              scope_strcpy(char *, const char *);
-char*              scope_strncpy(char *, const char *, size_t);
-char*              scope_stpcpy(char *, const char *);
-char*              scope_stpcpy(char *, const char *);
-char*              scope_stpncpy(char *, const char *, size_t);
+char *             scope_strchrnul(const char *, int);
+char *             scope_strcpy(char *, const char *);
+char *             scope_strncpy(char *, const char *, size_t);
+char *             scope_stpcpy(char *, const char *);
+char *             scope_stpcpy(char *, const char *);
+char *             scope_stpncpy(char *, const char *, size_t);
 size_t             scope_strcspn(const char *, const char *);
-char*              scope_strcat(char *, const char *);
-char*              scope_strncat(char *, const char *, size_t);
-char*              scope_strpbrk(const char *, const char *);
-char*              scope_strcasestr(const char *, const char *);
-char*              scope_strtok(char *, const char *);
-char*              scope_strtok_r(char *, const char *, char **);
-const char*        scope_gai_strerror(int);
+char *             scope_strcat(char *, const char *);
+char *             scope_strncat(char *, const char *, size_t);
+char *             scope_strpbrk(const char *, const char *);
+char *             scope_strcasestr(const char *, const char *);
+char *             scope_strtok(char *, const char *);
+char *             scope_strtok_r(char *, const char *, char **);
+const char *       scope_gai_strerror(int);
 
 // Network handling operations
 int             scope_gethostname(char *, size_t);
@@ -201,6 +244,7 @@ uint16_t        scope_htons(uint16_t);
 int           scope_atoi(const char *);
 int           scope_isspace(int);
 int           scope_isprint(int);
+int           scope_isdigit(int);
 void          scope_perror(const char *);
 int           scope_gettimeofday(struct timeval *, struct timezone *);
 int           scope_timer_create(clockid_t, struct sigevent *, timer_t *);
@@ -214,6 +258,8 @@ int           scope_usleep(useconds_t);
 int           scope_nanosleep(const struct timespec *, struct timespec *);
 int           scope_sigaction(int, const struct sigaction *, struct sigaction *);
 int           scope_sigemptyset(sigset_t *);
+int           scope_sigfillset(sigset_t *);
+int           scope_sigdelset(sigset_t *, int);
 int           scope_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
 int           scope_pthread_barrier_init(pthread_barrier_t *, const pthread_barrierattr_t *, unsigned);
 int           scope_pthread_barrier_destroy(pthread_barrier_t *);
@@ -225,7 +271,12 @@ int           scope_getpwuid_r(uid_t, struct passwd *, char *, size_t, struct pa
 pid_t         scope_getpid(void);
 pid_t         scope_getppid(void);
 uid_t         scope_getuid(void);
+uid_t         scope_geteuid(void);
+gid_t         scope_getegid(void);
+int           scope_seteuid(uid_t);
+int           scope_setegid(gid_t);
 gid_t         scope_getgid(void);
+pid_t         scope_getpgrp(void);
 void*         scope_dlopen(const char *, int);
 void*         scope_dlsym(void *, const char *);
 int           scope_dlclose(void *);
@@ -250,5 +301,20 @@ void*         scope_shmat(int, const void *, int);
 int           scope_shmdt(const void *);
 int           scope_shmget(key_t, size_t, int);
 int           scope_sched_getcpu(void);
+int           scope_ftruncate(int, off_t);
+int           scope_rand(void);
+void          scope_srand(unsigned int);
+int           scope_setns(int, int);
+int           scope_chown(const char *, uid_t, gid_t);
+int           scope_fchown(int, uid_t, gid_t);
+int           scope_getc(FILE *);
+int           scope_putc(int, FILE *);
+int           scope_symlink(const char *, const char *);
+int           scope_mq_close(mqd_t);
+int           scope_mq_send(mqd_t, const char *, size_t, unsigned int);
+ssize_t       scope_mq_receive(mqd_t, char *, size_t, unsigned int *);
+int           scope_mq_unlink(const char *);
+int           scope_mq_getattr(mqd_t, struct mq_attr *);
+
 
 #endif // __SCOPE_STDLIB_H__

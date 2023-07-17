@@ -32,22 +32,22 @@ This restriction is imposed to make the resulting executable more portable.
 
 The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. You should avoid custom filesystem configuration that interferes with AppScope's ability to use these directories.
 
+### Cross-Compatibility with Cribl Suite
+
+AppScope 1.3.2, Cribl Stream 4.1.1, Cribl Edge 4.1.1, and Cribl Search 4.1.1 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
+
 ### Known Limitations
 
-**Only** these runtimes are supported: 
-
-- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through go1.18.
+AppScope can instrument static executables only when they are written in Go.
 
 AppScope cannot:
 
 - Unload the libscope library, once loaded.
-- Unattach/detach from a running process, once attached.
-- Instrument static executables that are not written in Go.
-- Instrument Go executables on ARM.
-- Attach to any static application.
+- Instrument Go executables built with Go 1.10 or earlier.
+- Instrument static stripped Go executables built with Go 1.12 or earlier.
+- Instrument Java executables that use Open JVM 6 or earlier, or Oracle JVM 6 or earlier.
+- Obtain a core dump either (a) for a Go executable, or (b) in a musl libc environment.
 
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.
 
-Static executables can be scoped only if they are written in Go.
-
-Static stripped Go executables can be scoped only when built with go1.13 or newer.
+If you run AppScope on a system where [AppArmor](https://apparmor.net/) or [SELinux](https://github.com/SELinuxProject/selinux) are in an enforcing mode, it can be necessary to modify your AppArmor or SELinux profiles to allow AppScope (and the system as whole) to work normally.

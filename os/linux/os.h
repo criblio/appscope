@@ -8,6 +8,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <stdint.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -45,24 +46,36 @@
 extern char *program_invocation_short_name;
 
 extern int osGetProcname(char *, int);
+extern int osGetProcUidGid(pid_t, uid_t *, gid_t *);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
 extern int osInitTimer(platform_time_t *);
 extern int osGetProcMemory(pid_t);
-extern int osIsFilePresent(pid_t, const char *);
+extern int osIsFilePresent(const char *);
 extern int osGetCmdline(pid_t, char **);
-extern bool osThreadInit(void(*handler)(int), unsigned);
+extern bool osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
 extern int osGetExePath(pid_t, char **);
 extern bool osTimerStop(void);
+extern bool osIsScopeHandlerActive(void);
+extern void osSetAppSigaction(const struct sigaction *);
+extern void osGetAppSigaction(struct sigaction *const);
+extern bool osCallAppSigaction(int, siginfo_t *, void *);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
 extern char *osGetUserName(unsigned);
 extern char *osGetGroupName(unsigned);
 extern long long osGetProcCPU(void);
+extern uint64_t osFindLibrary(const char *, pid_t, bool);
+extern int osFindFd(pid_t, const char *);
+extern void osCreateSM(proc_id_t *, unsigned long);
+extern bool osMemPermAllow(void *, size_t, int, int);
+extern bool osMemPermRestore(void *, size_t, int);
+extern bool osGetBaseAddr(uint64_t *);
+extern int osGetArgv(pid_t, char *, size_t);
 
 #endif  //__OS_H__

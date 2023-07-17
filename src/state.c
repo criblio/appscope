@@ -15,6 +15,7 @@
 #include "com.h"
 #include "dbg.h"
 #include "dns.h"
+#include "evtutils.h"
 #include "httpstate.h"
 #include "metriccapture.h"
 #include "mtcformat.h"
@@ -48,7 +49,7 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-static search_t* g_http_redirect = NULL;
+static bool g_force_payloads_to_disk = FALSE;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 static protocol_def_t *g_statsd_protocol_def = NULL;
@@ -56,9 +57,6 @@ static protocol_def_t *g_statsd_protocol_def = NULL;
 // Linked list, indexed by channel ID, of net_info pointers used in
 // doProtocol() when it's not provided with a valid file descriptor.
 static list_t *g_extra_net_info_list = NULL;
-
-#define REDIRECTURL "fluentd"
-#define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -81,6 +79,13 @@ static list_t *g_extra_net_info_list = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
+
+bool
+payloadToDiskForced(void)
+{
+    return g_force_payloads_to_disk;
+}
 
 
 static void
@@ -288,17 +293,20 @@ initState()
     initHttpState();
     initMetricCapture();
 
+    // Some environment variables we don't want to continuously check
+    // TODO: verify if `g_force_payloads_to_disk` can be moved in cfgutils.c
+    g_force_payloads_to_disk = checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
+
+
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime
     scope_memset(g_http_guard, 0, sizeof(g_http_guard));
     {
         // g_http_guard_enable is always false unless
         // SCOPE_HTTP_SERIALIZE_ENABLE is defined and is "true"
-        char *spin_env = getenv("SCOPE_HTTP_SERIALIZE_ENABLE");
+        char *spin_env = fullGetEnv("SCOPE_HTTP_SERIALIZE_ENABLE");
         g_http_guard_enabled = (spin_env && !scope_strcmp(spin_env, "true"));
     }
-
-    g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
     initPayloadDetect();
@@ -562,7 +570,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     switch (type) {
     case OPEN_PORTS:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if (size < 0) {
             subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
         } else if (size > 0) {
@@ -580,7 +588,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NET_CONNECTIONS:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         counters_element_t* value = NULL;
 
         if (g_netinfo[fd].type == SOCK_STREAM) {
@@ -608,7 +616,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_DURATION:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         uint64_t new_duration = 0ULL;
         if (g_netinfo[fd].startTime != 0ULL) {
             new_duration = getDuration(g_netinfo[fd].startTime);
@@ -638,7 +646,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_OPEN:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
             ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
             addToInterfaceCounts(&g_netinfo[fd].counters.netConnOpen, 1);
@@ -653,7 +661,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_CLOSE:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
             ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
             addToInterfaceCounts(&g_netinfo[fd].counters.netConnClose, 1);
@@ -668,7 +676,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NETRX:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
         addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
         sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
@@ -685,7 +693,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NETTX:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
         addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
         sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
@@ -711,7 +719,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             addToInterfaceCounts(&g_ctrs.numDNS, 1);
         }
 
-        if (checkNetEntry(fd)) {
+        if (getNetEntry(fd)) {
             rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
         } else {
             rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
@@ -729,7 +737,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
         addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
 
-        if (checkNetEntry(fd)) {
+        if (getNetEntry(fd)) {
             rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
         } else {
             rc = postDNSState(fd, type, NULL, size, pathname);
@@ -977,7 +985,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         }
 
         if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = scope_calloc(1, sizeof(struct protocol_info_t))) == NULL)
+            if ((proto = evtProtoAllocDetect(protoDef->protname)) == NULL)
             {
                 if (cpdata)
                     scope_free(cpdata);
@@ -985,12 +993,9 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
                     pcre2_match_data_free(match_data);
                 return FALSE;
             }
-            proto->evtype = EVT_PROTO;
-            proto->ptype = EVT_DETECT;
             proto->len = sizeof(protocol_def_t);
             proto->fd = sockfd;
             if (net) proto->uid = net->uid;
-            proto->data = (char *)scope_strdup(protoDef->protname);
             cmdPostEvent(g_ctl, (char *)proto);
         }
 
@@ -1322,11 +1327,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         if (net && net->protoProtoDef) {
             // Process HTTP if detected and http or metrics are enabled
             if ((!scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) &&
-                ((cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) || (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP)))) {
+                ((cfgEvtEnable(g_cfg.staticfg) && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) ||
+                 (cfgMtcEnable(g_cfg.staticfg) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))))) {
                 doHttp(id, sockfd, net, buf, len, src, dtype);
             }
 
-            if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
+            if (cfgMtcEnable(g_cfg.staticfg) && cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
                 !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
 
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);
@@ -1519,7 +1525,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
     const struct sockaddr* addr;
     if (addr_arg) {
         addr = addr_arg;
-    } else if (checkNetEntry(fd)) {
+    } else if (getNetEntry(fd)) {
         addr = (struct sockaddr*)&g_netinfo[fd].localConn;
     } else {
         return 0;
@@ -1581,7 +1587,7 @@ doSetAddrs(int sockfd)
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
-        ctlPayEnable(g_ctl);
+        (ctlPayStatus(g_ctl) != PAYLOAD_STATUS_DISABLE);
     if (!need_to_track_addrs) return 0;
 
     /*
@@ -1952,38 +1958,6 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
 }
 
 int
-doURL(int sockfd, const void *buf, size_t len, metric_t src)
-{
-    if (g_cfg.urls == 0) return 0;
-
-    if (checkNetEntry(sockfd) == TRUE) {
-        if (!g_netinfo[sockfd].active) {
-            doAddNewSock(sockfd);
-        }
-
-        doSetAddrs(sockfd);
-    }
-
-
-    if ((src == NETTX) && (searchExec(g_http_redirect, (char *)buf, len) != -1)) {
-        g_netinfo[sockfd].urlRedirect = TRUE;
-        return 0;
-    }
-
-    if ((src == NETRX) && (g_netinfo[sockfd].urlRedirect == TRUE) &&
-        (len >= scope_strlen(OVERURL))) {
-        g_netinfo[sockfd].urlRedirect = FALSE;
-        // explicit vars as it's nice to have in the debugger
-        //char *sbuf = (char *)buf;
-        char *url = OVERURL;
-        int urllen = scope_strlen(url);
-        scope_strncpy((char *)buf, url, urllen);
-        return urllen;
-    }
-    return 0;
-}
-
-int
 doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 {
     if (checkNetEntry(sockfd) == TRUE) {
@@ -2217,7 +2191,7 @@ void
 doStatPath(const char *path, int rc, const char *func)
 {
     if (rc != -1) {
-        scopeLog(CFG_LOG_DEBUG, "%s", func);
+        scopeLog(CFG_LOG_TRACE, "%s", func);
         doUpdateState(FS_STAT, -1, 0, func, path);
     } else {
         doUpdateState(FS_ERR_STAT, -1, (size_t)0, func, path);
@@ -2367,7 +2341,7 @@ doClose(int fd, const char *func)
     // report everything before the info is lost
     reportFD(fd, EVENT_BASED);
 
-    if (ninfo) scope_memset(ninfo, 0, sizeof(struct net_info_t));
+    if (ninfo) ninfo->active = FALSE;
     if (fsinfo) scope_memset(fsinfo, 0, sizeof(struct fs_info_t));
 
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
@@ -2421,14 +2395,12 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
-            int errsave = scope_errno;
 
             if (scope_stat(g_fsinfo[fd].path, &sbuf) == 0) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;
             }
-            scope_errno = errsave;
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);

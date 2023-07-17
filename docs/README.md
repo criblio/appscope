@@ -7,6 +7,7 @@ We keep developer-specific docs here. Before delving in, you should be familiar 
 
 Once you're past those, take a look at these.
 
+- [CONTRIBUTING](./CONTRIBUTING.md) - Contribution Guidelines
 - [RELEASE](./RELEASE.md) - Release Process
 - [BUILD](./BUILD.md) - Build System
 - [INTEGRATION](../test/integration/README.md) - Integration Testing

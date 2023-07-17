@@ -40,9 +40,10 @@ B<openssl> B<rsa>
 [B<-pubout>]
 [B<-RSAPublicKey_in>]
 [B<-RSAPublicKey_out>]
+[B<-pvk-strong>]
+[B<-pvk-weak>]
+[B<-pvk-none>]
 {- $OpenSSL::safe::opt_engine_synopsis -}{- $OpenSSL::safe::opt_provider_synopsis -}
-
-=for openssl ifdef pvk-strong pvk-weak pvk-none engine
 
 =head1 DESCRIPTION
 
@@ -56,7 +57,6 @@ various forms and their components printed out.
 =item B<-help>
 
 Print out a usage message.
-
 
 =item B<-inform> B<DER>|B<PEM>|B<P12>|B<ENGINE>
 
@@ -134,16 +134,33 @@ the input is a public key.
 
 Like B<-pubin> and B<-pubout> except B<RSAPublicKey> format is used instead.
 
+=item B<-pvk-strong>
+
+Enable 'Strong' PVK encoding level (default).
+
+=item B<-pvk-weak>
+
+Enable 'Weak' PVK encoding level.
+
+=item B<-pvk-none>
+
+Don't enforce PVK encoding.
+
 {- $OpenSSL::safe::opt_engine_item -}
 
 {- $OpenSSL::safe::opt_provider_item -}
 
 =back
 
+=head1 NOTES
+
+The L<openssl-pkey(1)> command is capable of performing all the operations
+this command can, as well as supporting other public key types.
+
 =head1 EXAMPLES
 
-Examples equivalent to these can be found in the documentation for the
-non-deprecated L<openssl-pkey(1)> command.
+The documentation for the L<openssl-pkey(1)> command contains examples
+equivalent to the ones listed here.
 
 To remove the pass phrase on an RSA private key:
 

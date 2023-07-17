@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <libgen.h>
 
 #include "cfgutils.h"
 #include "dbg.h"
@@ -52,6 +53,9 @@
 #define SUMMARYPERIOD_NODE       "summaryperiod"
 #define COMMANDDIR_NODE          "commanddir"
 #define CFGEVENT_NODE            "configevent"
+#define SNAPSHOT_NODE            "snapshot"
+#define COREDUMP_NODE                "coredump"
+#define BACKTRACE_NODE               "backtrace"
 
 #define EVENT_NODE           "event"
 #define TRANSPORT_NODE           "transport"
@@ -96,19 +100,25 @@
 #define ANCESTOR_NODE                "ancestor"
 #define CONFIG_NODE              "config"
 
+#if SCOPE_PROM_SUPPORT != 0
+enum_map_t formatMap[] = {
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
+    {"prometheus",            CFG_FMT_PROMETHEUS},
+    {NULL,                    -1}
+};
+#else 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
     {"ndjson",                CFG_FMT_NDJSON},
     {NULL,                    -1}
 };
-
+#endif
 enum_map_t transportTypeMap[] = {
     {"udp",                   CFG_UDP},
     {"tcp",                   CFG_TCP},
     {"unix",                  CFG_UNIX},
     {"file",                  CFG_FILE},
-    {"syslog",                CFG_SYSLOG},
-    {"shm",                   CFG_SHM},
     {"edge",                  CFG_EDGE},
     {NULL,                   -1}
 };
@@ -188,6 +198,8 @@ void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 void cfgCriblEnableSetFromStr(config_t *, const char *);
+void cfgSnapShotCoredumpEnableSetFomStr(config_t *, const char *);
+void cfgSnapshotBacktraceEnableSetFomStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
@@ -221,8 +233,8 @@ cfgPathSearch(const char* cfgname)
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
 
-    const char *homedir = getenv("HOME");
-    const char *scope_home = getenv("SCOPE_HOME");
+    const char *homedir = fullGetEnv("HOME");
+    const char *scope_home = fullGetEnv("SCOPE_HOME");
     if (scope_home &&
        (scope_snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
         !scope_access(path, R_OK)) {
@@ -262,7 +274,7 @@ cfgPathSearch(const char* cfgname)
 char *
 cfgPath(void)
 {
-    const char* envPath = getenv("SCOPE_CONF_PATH");
+    const char* envPath = fullGetEnv("SCOPE_CONF_PATH");
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char *path;
@@ -288,7 +300,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
     char name_buf[1024];
     scope_strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
+    char* name = name_buf + C_STRLEN("SCOPE_TAG_");
 
     // convert the "=" to a null delimiter for the name
     char* end = scope_strchr(name, '=');
@@ -368,7 +380,7 @@ doEnvVariableSubstitution(const char* value)
         char env_name[match_size + 1];
         scope_strncpy(env_name, &inptr[match.rm_so], match_size);
         env_name[match_size] = '\0';
-        char* env_value = getenv(&env_name[1]); // offset of 1 skips the $
+        char* env_value = fullGetEnv(&env_name[1]); // offset of 1 skips the $
 
         // Grow outval buffer any time env_value is bigger than env_name
         int size_growth = (!env_value) ? 0 : scope_strlen(env_value) - match_size;
@@ -428,6 +440,25 @@ processReloadConfig(config_t *cfg, const char* value)
 
     if (cfgLogStreamEnable(cfg)) {
         cfgLogStreamDefault(cfg);
+    }
+}
+
+extern bool cmdDetach(void);
+extern bool cmdAttach(void);
+
+static void
+processAttach(const char* value)
+{
+    if (!value) return;
+    unsigned int attach = strToVal(boolMap, value);
+
+    switch (attach) {
+        case FALSE:
+            cmdDetach();
+            break;
+        case TRUE:
+            cmdAttach();
+            break;
     }
 }
 
@@ -506,6 +537,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         processCmdDebug(value);
     } else if (!scope_strcmp(env_name, "SCOPE_CONF_RELOAD")) {
         processReloadConfig(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_CMD_ATTACH")) {
+        processAttach(value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
@@ -616,6 +649,10 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgAuthTokenSetFromStr(cfg, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_name, "SCOPE_SNAPSHOT_COREDUMP")) {
+        cfgSnapShotCoredumpEnableSetFomStr(cfg, value);
+    }  else if (startsWith(env_name, "SCOPE_SNAPSHOT_BACKTRACE")) {
+        cfgSnapshotBacktraceEnableSetFomStr(cfg, value);
     }
 
 cleanup:
@@ -640,6 +677,7 @@ cfgProcessEnvironment(config_t* cfg)
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
         if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
+        if (startsWith(e, "SCOPE_CMD_ATTACH")) continue;
         if (startsWith(e, "SCOPE_CONF_RELOAD")) continue;
 
         // Process everything else.
@@ -832,7 +870,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("udp://") - 1);
+        char *host = value_cpy + C_STRLEN("udp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -851,7 +889,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("tcp://") - 1);
+        char *host = value_cpy + C_STRLEN("tcp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -865,14 +903,14 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == scope_strstr(value, "file://")) {
-        const char *path = value + (sizeof("file://") - 1);
+        const char *path = value + C_STRLEN("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
     } else if (value == scope_strstr(value, "unix://")) {
-        const char *path = value + (sizeof("unix://") - 1);
+        const char *path = value + C_STRLEN("unix://");
         cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
-    } else if (scope_strncmp(value, "edge", sizeof("edge") - 1) == 0) {
+    } else if (scope_strncmp(value, "edge", C_STRLEN("edge")) == 0) {
         cfgTransportTypeSet(cfg, t, CFG_EDGE);
     }
 }
@@ -940,6 +978,20 @@ cfgAuthTokenSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgAuthTokenSet(cfg, value);
+}
+
+void
+cfgSnapShotCoredumpEnableSetFomStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgSnapshotCoredumpSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgSnapshotBacktraceEnableSetFomStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgSnapshotBacktraceSet(cfg, strToVal(boolMap, value));
 }
 
 #ifndef NO_YAML
@@ -1133,6 +1185,39 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    LEVEL_NODE,           processLevel},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportLog},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+processCoredump(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgSnapShotCoredumpEnableSetFomStr(config, value);
+    if (value) scope_free(value);
+}
+
+static void
+processBacktrace(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgSnapshotBacktraceEnableSetFomStr(config, value);
+    if (value) scope_free(value);
+}
+
+static void
+processSnapshot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+    
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    COREDUMP_NODE,        processCoredump},
+        {YAML_SCALAR_NODE,    BACKTRACE_NODE,       processBacktrace},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1535,6 +1620,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
         {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
+        {YAML_MAPPING_NODE,   SNAPSHOT_NODE,        processSnapshot},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1877,7 +1963,7 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
         if (equal) *equal = '\0';
         char *envName = valueStr;
         char *envVal = equal ? equal+1 : NULL;
-        char *env = getenv(envName);
+        char *env = fullGetEnv(envName);
         if (env) {
             if (envVal) {
                 if (!scope_strcmp(env, envVal)) {
@@ -2208,8 +2294,6 @@ createTransportJson(config_t* cfg, which_transport_t trans)
             if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
                  valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
         case CFG_EDGE:
             break;
         default:
@@ -2234,6 +2318,25 @@ createLogJson(config_t* cfg)
 
     if (!(transport = createTransportJson(cfg, CFG_LOG))) goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createSnapshotJson(config_t *cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, COREDUMP_NODE,
+         valToStr(boolMap, cfgSnapshotCoredumpEnable(cfg)))) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, BACKTRACE_NODE,
+         valToStr(boolMap, cfgSnapshotBacktraceEnable(cfg)))) goto err;
 
     return root;
 err:
@@ -2478,13 +2581,17 @@ err:
 static cJSON*
 createLibscopeJson(config_t* cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
     cJSON *log;
+    cJSON *snapshot;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
+
+    if (!(snapshot = createSnapshotJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, SNAPSHOT_NODE, snapshot);
 
     if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
                  valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;
@@ -2622,9 +2729,6 @@ initTransport(config_t* cfg, which_transport_t t)
     transport_t* transport = NULL;
 
     switch (cfgTransportType(cfg, t)) {
-        case CFG_SYSLOG:
-            transport = transportCreateSyslog();
-            break;
         case CFG_FILE:
             transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
             break;
@@ -2644,9 +2748,6 @@ initTransport(config_t* cfg, which_transport_t t)
                                            cfgTransportTlsEnable(cfg, t),
                                            cfgTransportTlsValidateServer(cfg, t),
                                            cfgTransportTlsCACertPath(cfg, t));
-            break;
-        case CFG_SHM:
-            transport = transportCreateShm();
             break;
         default:
             DBG("%d", cfgTransportType(cfg, t));
@@ -2767,9 +2868,18 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    // We'll create a dedicated payload channel, conditionally.
-    if (cfgLogStreamEnable(cfg)
-            && (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads())) {
+    /*
+     * Determine the status of payload channel based on configuration
+     */
+    payload_status_t payloadStatus = PAYLOAD_STATUS_DISABLE;
+    if (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads()) {
+        if (cfgLogStreamEnable(cfg) && !payloadToDiskForced() ) {
+            payloadStatus = PAYLOAD_STATUS_CRIBL;
+        } else {
+            payloadStatus = PAYLOAD_STATUS_DISK;
+        }
+    }
+    if (payloadStatus == PAYLOAD_STATUS_CRIBL) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2789,7 +2899,7 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
-    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayStatusSet(ctl, payloadStatus);
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
     ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 
@@ -2802,12 +2912,13 @@ initCtl(config_t *cfg)
  * and the config file to:
  *
  * - use a single IP:port/UNIX socket for events, metrics & remote commands
- * - set metrics to use ndjson
  * - use a separate connection over the single IP:port/UNIX socket for payloads
  * - include the abbreviated json header for payloads
- * - watch types enabled for files, console, net, fs, http, dns
- * - log level warning
- * - all else uses defaults
+ * - set metrics to use ndjson
+ * - increase log level to warning if set to none or error
+ * - set configevent (SCOPE_CONFIG_EVENT) to true
+ *
+ * all else reflects the rules file, config file, and env vars
  */
 int
 cfgLogStreamDefault(config_t *cfg)
@@ -2896,4 +3007,697 @@ destroyProtEntry(void *data)
     if (pre->regex) scope_free(pre->regex);
     if (pre->protname) scope_free(pre->protname);
     scope_free(pre);
+}
+
+// Rules Configuration
+
+/*
+These rules describe which (if any) rules file is used.
+In order described here, the first true statement wins.
+- If the env variable SCOPE_RULES exists, and it's value is a path to a
+    file that can be read
+- If the env variable CRIBL_HOME exists, and $CRIBL_HOME/appscope/scope_rules 
+    is a path to a file that can be read
+- If the file /usr/lib/appscope/scope_rules exists and can be read
+
+Rules regarding the rules file:
+o) If the rules file exists, but contains any invalid (unparseable) yaml,
+   no processes will be scoped by the rules feature
+o) If the env variable SCOPE_RULES exists with a value of "false",
+   no processes will be scoped by the rules feature
+o) If the env variable CRIBL_HOME exists but no rules file is found in
+   $CRIBL_HOME/appscope/scope_rules,
+   no processes will be scoped by the rules feature
+o) If a rules file is not found,
+   no processes will be scoped by the rules feature
+
+Rules regarding some of the content of the rules file:
+o) The allow list and deny list are made of a ordered sequence of rules
+o) For the allow list, each rules has these fields: procname, arg, and config
+o) For the deny list, each rules has a procname and arg field
+o) Extra valid (parseable) yaml is allowed anywhere in the rules file,
+   but will be ignored by AppScope
+
+Definition of what it means to match a rule:
+o) By “the process matches the rules", we mean that the one or more
+   of these conditions is true:
+- the value of the procname field is an exact match of the process name
+  (is case-sensitive)
+- the value of the arg field appears somewhere in the process name and
+  arguments. (is case-sensitive)
+- the value of the procname or arg field is the literal string _MatchAll_
+  (See "Example of _MatchAll_ syntax" comment below)
+
+When a valid, parseable rules file is found, it controls which processes
+will be scoped:
+o) If a process does not match any allow list rules,
+   it will not be scoped by the rules feature
+o) If a process matches any rules in the deny list,
+   it will not be scoped by the rules feature
+o) If a process matches any rules in the allow list, and
+   does not match any rules in the deny list,
+   it will be scoped by the rules feature.
+o) For clarity, if a process matches both the allow list and deny list,
+   it will not be scoped by the rules feature.
+
+How configuration is determined:
+o) Default values are used for initial values of the configuration
+o) Rules of an allow list are processed in order. The process always
+   evaluates all rules.
+o) For each rules that matches, the config fields are applied to the process.
+o) A config field can have any number of child elements. Empty configurations,
+   partial configurations, and complete configurations are all allowed.
+o) For clarity, when rules match, all config fields defined by that rules
+   overwrite any earlier config values whether the value is a default value
+   or from an earlier matching rules.
+*/
+
+/*
+Example of _MatchAll_ syntax.  If the rules file contains this content,
+all processes will match, and the configuration will all be default values
+except that log level will be set to error.
+
+allow:
+- procname: _MatchAll_
+  config:
+    libscope:
+      log:
+        level: error
+*/
+
+#define ALLOW_NODE             "allow"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define ALLOW_CONFIG_NODE        "config"
+#define DENY_NODE              "deny"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define SOURCE_NODE            "source"
+#define UNIX_SOCKET_PATH_NODE    "unixSocketPath"
+
+#define MATCH_ALL_VAL       "_MatchAll_"
+
+typedef enum {
+    PROC_NOT_FOUND,
+    PROC_ALLOWED,
+    PROC_DENIED,
+} proc_status;
+
+typedef struct {
+    const char *procName;    // process name which be searched in the rules file
+    const char *procCmdLine; // process command line which be searched in the rules file
+    proc_status  status;     // status describes the presence of the process on list
+    config_t *cfg;           // configuration for the scope list
+    bool rulesMatch;        // flag indicate that cfg should be parsed for the process
+} rules_cfg_t;
+
+typedef void (*node_rules_fn)(yaml_document_t *, yaml_node_t *, void *);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_rules_fn fn;
+} parse_rules_table_t;
+
+
+typedef void (*node_rules_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_rules_unix_path_fn fn;
+} parse_rules_unix_path_t;
+
+/*
+* Process key value pair rules
+*/
+static void
+processKeyValuePairRules(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_rules_table_t *fEntry, void *extData) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+            fEntry[i].fn(doc, nodeValue, extData);
+            break;
+        }
+    }
+}
+
+/*
+* Process key value pair filter for finding the Unix Path
+*/
+static void
+processKeyValuePairRulesUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_rules_unix_path_t *fEntry, char **unixPath) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+                fEntry[i].fn(doc, nodeValue, unixPath);
+                break;
+        }
+    }
+}
+
+/*
+* Process allow process name Scalar Node
+*/
+static void
+processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
+        fCfg->status = PROC_ALLOWED;
+        fCfg->rulesMatch = TRUE;
+    }
+}
+
+/*
+* Verifies if entry is not empty
+*/
+static void
+processEntryIsNotEmpty(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *value = (const char *)node->data.scalar.value;
+    bool *status = (bool *)extData;
+    if (scope_strlen(value) > 0) {
+        *status = TRUE;
+    }
+}
+
+/*
+* Process allow process command line Scalar Node
+*/
+static void
+processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+         || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
+        fCfg->status = PROC_ALLOWED;
+        fCfg->rulesMatch = TRUE;
+    }
+}
+
+/*
+* Process allow configuration Node
+*/
+static void
+processAllowConfig(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+
+    if (fCfg->rulesMatch) {
+        processRoot(fCfg->cfg, doc, node);
+        fCfg->rulesMatch = FALSE;
+    }
+}
+
+/*
+* Process allow/deny sequence list (validation)
+*/
+static void
+processValidAllowDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_rules_table_t rules[] = {
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processEntryIsNotEmpty},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processEntryIsNotEmpty},
+        {YAML_NO_NODE,      NULL,          NULL}
+    };
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        // processs the rules first (before the config)
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairRules(doc, pair, rules, extData);
+        }
+    }
+}
+
+/*
+* Process allow sequence list
+*/
+static void
+processAllowSeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_rules_table_t rules[] = {
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processAllowProcNameScalar},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,          NULL}
+    };
+    parse_rules_table_t config[] = {
+        {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
+        {YAML_NO_NODE,      NULL,                NULL}
+    };
+
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        // processs the rules first (before the config)
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairRules(doc, pair, rules, extData);
+        }
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairRules(doc, pair, config, extData);
+        }
+    }
+}
+
+/*
+* Process deny process name Scalar Node
+*/
+static void
+processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
+        fCfg->status = PROC_DENIED;
+    }
+}
+
+/*
+* Process deny process command line Scalar Node
+*/
+static void
+processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
+        fCfg->status = PROC_DENIED;
+    }
+}
+
+/*
+* Process deny sequence list
+*/
+static void
+processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_rules_table_t t[] = {
+        {YAML_SCALAR_NODE, PROCNAME_NODE, processDenyProcNameScalar},
+        {YAML_SCALAR_NODE, ARG_NODE,      processDenyProcCmdLineScalar},
+        {YAML_NO_NODE,     NULL,          NULL}
+    };
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairRules(doc, pair, t, extData);
+        }
+    }
+}
+
+/*
+* Process Unix Socket Path Node
+*/
+static void
+processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPath) {
+    if (!node || (node->type != YAML_SCALAR_NODE)) return;
+
+    const char *unixCfgPath = (const char *)node->data.scalar.value;
+
+    if (scope_strlen(unixCfgPath) > 0) {
+        *unixPath = scope_strdup(unixCfgPath);
+    }
+}
+
+/*
+* Process source Node
+*/
+static void
+processSourceNode(yaml_document_t *doc, yaml_node_t *node, char **unixPath) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_rules_unix_path_t sourceNodes[] = {
+        {YAML_SCALAR_NODE,    UNIX_SOCKET_PATH_NODE, processUnixSocketPathNode},
+        {YAML_NO_NODE,        NULL,                  NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, sourceNodes, unixPath);
+    }
+}
+
+/*
+* Process Rules Root node (starting point)
+*/
+static void
+processRulesRootNode(yaml_document_t *doc, void *extData) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+
+    yaml_node_pair_t *pair;
+    // process allow before deny so deny "overrides" allow
+    // if a process appears in both, it should not be scoped
+    parse_rules_table_t allow[] = {
+        {YAML_SEQUENCE_NODE, ALLOW_NODE, processAllowSeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, allow, extData);
+    }
+
+    parse_rules_table_t deny[] = {
+        {YAML_SEQUENCE_NODE, DENY_NODE,  processDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, deny, extData);
+    }
+}
+
+static void
+processRulesValidRootNode(yaml_document_t *doc, void *extData) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+
+    yaml_node_pair_t *pair;
+    parse_rules_table_t allow[] = {
+        {YAML_SEQUENCE_NODE, ALLOW_NODE, processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, allow, extData);
+    }
+
+    parse_rules_table_t deny[] = {
+        {YAML_SEQUENCE_NODE, DENY_NODE,  processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, deny, extData);
+    }
+}
+
+/*
+* Process Rules Source node (starting point)
+*/
+static void
+processRulesSourceSection(yaml_document_t *doc, char **unixPath) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+    yaml_node_pair_t *pair;
+
+    parse_rules_unix_path_t meta[] = {
+        {YAML_MAPPING_NODE,  SOURCE_NODE,  processSourceNode},
+        {YAML_NO_NODE,       NULL,         NULL}
+    };
+
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, meta, unixPath);
+    }
+}
+
+/*
+ * Parse scope rules file
+ *
+ * Returns TRUE if rules file was successfully parsed, FALSE otherwise
+ */
+static bool
+rulesParseFile(const char* rulesPath, rules_cfg_t *fCfg) {
+    FILE *fs;
+    bool status = FALSE;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    if ((fs = scope_fopen(rulesPath, "rb")) == NULL) {
+        return status;
+    }
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fs);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    processRulesRootNode(&doc, fCfg);
+
+    status = TRUE;
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fs);
+
+    return status;
+}
+
+/*
+ * Verify against rules file if specifc process command should be scoped.
+ */
+rules_status_t
+cfgRulesStatus(const char *procName, const char *procCmdLine, const char *rulesPath, config_t *cfg)
+{
+    if ((!procName) || (!procCmdLine) || (!cfg)) {
+        DBG(NULL);
+        return RULES_ERROR;
+    }
+
+    /*
+    *  If the rules file is missing (NULL) we scope every process
+    */
+    if (rulesPath == NULL) {
+        return RULES_SCOPED;
+    }
+
+    rules_cfg_t fCfg = {.procName = procName,
+                         .procCmdLine = procCmdLine,
+                         .status = PROC_NOT_FOUND,
+                         .rulesMatch = FALSE,
+                         .cfg = cfg};
+    bool res = rulesParseFile(rulesPath, &fCfg);
+    if (res == FALSE) {
+        return RULES_ERROR;
+    }
+
+    switch (fCfg.status) {
+        case PROC_NOT_FOUND:
+        case PROC_DENIED:
+            return RULES_NOT_SCOPED;
+        case PROC_ALLOWED:
+            return RULES_SCOPED_WITH_CFG;
+    }
+
+    DBG(NULL);
+    return RULES_ERROR;
+}
+
+const char *
+cfgRulesFilePath(void)
+{
+    char *rulesFilePath = NULL;
+    char *envRulesVal = getenv("SCOPE_RULES");
+    const char *criblHome = getenv("CRIBL_HOME");
+    char criblRulesPath[PATH_MAX];
+
+    if (envRulesVal) {
+        if (!scope_strcmp(envRulesVal, "false")) {
+            // SCOPE_RULES is false (use of rules file is disabled)
+            rulesFilePath = NULL;
+        } else if (!scope_access(envRulesVal, R_OK)) {
+            // SCOPE_RULES contains the path to a rules file.
+            rulesFilePath = envRulesVal;
+        }
+    } else if (criblHome) {
+        // If $CRIBL_HOME is set, only look for a rules file there instead
+        if (scope_snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
+            scopeLogError("snprintf");
+        }
+        if (!scope_access(criblRulesPath, R_OK)) {
+            rulesFilePath = criblRulesPath;
+        }
+    } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
+        // rules file was at first default location
+        rulesFilePath = SCOPE_RULES_USR_PATH;
+    }
+
+    // check if rules file can actually be used
+    if ((rulesFilePath) && (cfgRulesFileIsValid(rulesFilePath) == FALSE)) {
+        rulesFilePath = NULL;
+    }
+
+    return rulesFilePath;
+}
+
+/*
+ * Returns the UNIX socket path defined in the rules file's "source" section.
+ * The "source" section is an optional section that contains additional
+ * information. AppScope utilizes it to retrieve information about the
+ * UNIX path ("unixSocketPath"), which can be used as the receiver point for
+ * AppScope data.
+ * One example of an application that generates the rules file with proper
+ * "source" data is Edge (https://cribl.io/edge/).
+ * 
+ * Memory for the UNIX socket path is obtained with scope_strdup and can
+ * be freed with scope_free.
+*/
+char *
+cfgRulesUnixPath(void) {
+    char *unixPath = NULL;
+
+    const char *rulesPath = cfgRulesFilePath();
+    if (!rulesPath) {
+        return unixPath;
+    }
+
+    FILE *fp = scope_fopen(rulesPath, "rb");
+    if (!fp) {
+        return unixPath;
+    }
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fp);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    /*
+    * Extract the unixSocketPath from rules file
+    *
+    "source": {
+      "id": "in_appscope",
+      "enableUnixPath": true,
+      "unixSocketPath": "/opt/cribl/state/appscope.sock",
+      "tls": {
+        "disabled": true
+      },
+      "host": "0.0.0.0",
+      "port": 10090,
+      "authToken": ""
+    }
+    */
+
+    processRulesSourceSection(&doc, &unixPath);
+
+    // Do we want a log message if there's an issue here?
+    if (unixPath) {
+        unixPath = scope_dirname(unixPath);
+    }
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fp);
+
+    return unixPath;
+}
+
+/*
+ * Check if rules file specified by Path is valid:
+ * - contains at least deny or allow section
+ */
+bool
+cfgRulesFileIsValid(const char *rulesPath) {
+    FILE *fs;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+    bool status = FALSE;
+    bool res;
+
+    if ((fs = scope_fopen(rulesPath, "rb")) == NULL) {
+        return status;
+    }
+
+    res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fs);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    processRulesValidRootNode(&doc, &status);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fs);
+
+    return status;
 }

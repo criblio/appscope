@@ -11,12 +11,8 @@
 #include "utils.h"
 #include "scopestdlib.h"
 
-#define UNW_LOCAL_ONLY
-#include "libunwind.h"
-
 #define MAX_INSTANCES_PER_LINE 2
 #define MAX_NUM_LINES 256
-#define SYMBOL_BT_NAME_LEN (256)
 
 typedef struct {
     time_t time;
@@ -40,6 +36,10 @@ proc_id_t g_proc = {0};
 bool g_constructor_debug_enabled;
 uint64_t g_cbuf_drop_count = 0;
 bool g_ismusl = FALSE;
+bool g_isstatic = FALSE;
+bool g_isgo = FALSE;
+bool g_issighandler = FALSE;
+char g_libpath[PATH_MAX] = {};
 
 void
 dbgInit()
@@ -244,7 +244,7 @@ void
 dbgAddLine(const char *key, const char *fmt, ...)
 {
     // TODO verify should this be called always
-    // scopeBacktrace(CFG_LOG_ERROR);
+    // scopeLogBacktrace();
 
     if (!g_dbg) return;
 
@@ -275,34 +275,14 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     return;
 }
 
+// This is used to quiet "unused variable" compiler warnings for callers of
+// scopeLogDebug and scopeLogTrace when DEBUG is not defined.  This warning
+// can happen during compilation of calling code when function arguments are
+// variables.
 void
-scopeBacktrace(cfg_log_level_t level)
+scopeLogDropItOnTheFloor(const char *format, ...)
 {
-    unw_cursor_t cursor;
-    unw_context_t uc;
-    unw_word_t ip;
-
-    unw_getcontext(&uc);
-    unw_init_local(&cursor, &uc);
-    int frame_count = 0;
-    scopeLog(level, "--- scopeBacktrace");
-    while(unw_step(&cursor) > 0) {
-        char symbol[SYMBOL_BT_NAME_LEN];
-        unw_word_t offset;
-
-        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
-        if (ret) {
-            continue;
-        }
-
-        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
-        if (!ret) {
-            scopeLog(level, "#%d 0x%lx %s + %d", frame_count, (long)ip, symbol, (int)offset);
-        } else {
-            scopeLog(level, "#%d  0x%lx ?", frame_count, (long)ip);
-        }
-        frame_count++;
-    }
+    return;
 }
 
 void

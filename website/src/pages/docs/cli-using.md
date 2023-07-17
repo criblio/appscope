@@ -4,17 +4,17 @@ title: Using the CLI
 
 ## Using The Command Line Interface (CLI)
 
-As soon as you [download](downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
+As soon as you [download](/docs/downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
 
-The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem.
+The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem by default, and you can [specify](#invoke-config) a different destination.
 
-By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events. 
+By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events.
 
-To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
+To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](/docs/examples-use-cases), which include both CLI and library use cases.
 
 ### CLI Basics
 
-The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](explore-captured) that data.
+The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](#scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](#explore-captured) that data.
 
 #### Scope a New Process 
 
@@ -78,6 +78,7 @@ scope curl --header "X-Appscope: Brazil" wttr.in/riodejaneiro
 
 In the resulting AppScope events, the `body` > `data` element would include an `"x-appscope"` field whose value would be the country named in the request's `X-Appscope` header.
 
+<span id="invoke-config"></span>
 
 #### Invoke a Config File While Scoping a New Process
 
@@ -93,7 +94,7 @@ scope run -u cloud.yml -- echo foo
 
 ### Scoping a Running Process
 
-You attach AppScope to a process using either a process ID or a process name.
+You [attach](/docs/cli-reference#attach) AppScope to a process using either a process ID or a process name.
 
 #### Attaching by Process ID
 
@@ -101,8 +102,8 @@ In this example, we'll start by grepping for process IDs of `cribl` (Cribl Strea
 
 ```
 $ ps -ef | grep cribl
-ubuntu    1820     1  1 21:03 pts/4    00:00:02 /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl server
-ubuntu    1838  1820  4 21:03 pts/4    00:00:07 /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl.js server -r CONFIG_HELPER
+ubuntu    1820     1  1 21:03 pts/4    00:00:02 /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl server
+ubuntu    1838  1820  4 21:03 pts/4    00:00:07 /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl.js server -r CONFIG_HELPER
 ubuntu    1925 30025  0 21:06 pts/3    00:00:00 grep --color=auto cribl
 ```
 
@@ -120,46 +121,63 @@ In this example, we try to attach to a Cribl Stream process by its name, which w
 $ sudo scope attach cribl
 Found multiple processes matching that name...
 ID  PID   USER    SCOPED  COMMAND
-1   1820  ubuntu  false   /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl server
-2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl.js server -r CONFIG_HELPER
+1   1820  ubuntu  false   /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl server
+2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/4.0.3/m/cribl/bin/cribl.js server -r CONFIG_HELPER
 Select an ID from the list:
 2
 WARNING: Session history will be stored in /home/ubuntu/.scope/history and owned by root
 Attaching to process 1838
-
 ```
+
+#### Detaching from Processes
+
+You can also [detach](/docs/cli-reference#detach) AppScope from a process.
+
+Furthermore, if you want to undo the effects of the `scope attach`, `scope start`, and/or `scope service` commands, run the `scope stop` [command](/docs/cli-reference#stop). This runs `scope detach --all`, removes the rules file from the system, and removes `scope` from service configurations.
+
+When you detach from a process, AppScope:
+
+- Stops emitting events and metrics for the process.
+- Closes relevant connections.
+- Removes its interpositions from the process' functions, and/or unhooks from the process' functions, as relevant.
+
+What AppScope does **not** do is unload its library.
 
 #### More About Scoping Running Processes
 
 To attach AppScope to a running process:
 
 1. You must run `scope` as root, or with `sudo`.
-1. If you attach to a shell, AppScope does not automatically scope its child processes.
-1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container.
-  - However:
-    You **cannot** attach to a process that is executing within a container context by running `scope attach` **outside** that container (for example, in the host OS, or in a different container).
+1. If you attach to a shell, AppScope does not automatically scope its child processes. <!-- TBD correct? ask Donn -->
+1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container or from the host.
 
 When you attach AppScope to a process, its child processes are not automatically scoped.
 
 You cannot attach to a static executable's process.
 
-No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
+No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package. <!-- TBD still true? ask John  -->
 
 No events are emitted from files or sockets that exist before AppScope attaches to a process.
 
-- After AppScope attaches to a process, AppScope will not report any **new** activity on file or socket descriptors that the process had already opened.
-
+- AppScope events will be produced only for file or socket descriptors opened **after** AppScope is attached.
+  
   - For example, suppose a process opens a socket descriptor before AppScope is attached. Subsequent sends and receives on this socket will not produce AppScope events.
 
-   - AppScope events will be produced only for sockets opened **after** AppScope is attached.
+<span id="payloads"></span>
+
+### Working with HTTP Payloads
+
+When you scope an app that produces HTTP traffic, you can capture the payloads using the `-p` or `--payloads` option. This is AppScope's  **payloads** feature (see the `payload` section in the AppScope [config file](/docs/config)), which is disabled by default, because it can create large amounts of data, and because it captures payloads unencrypted.
+
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
 
 <span id="explore-captured"></span>
 
 ### Exploring Captured Data
 
-You can scope apps that generate large data sets, and then use AppScope CLI sub-commands and options to monitor and visualize the data.
+You can scope apps that generate large data sets, and then use AppScope CLI subcommands and options to monitor and visualize the data. The following extended example introduces this technique.
 
-Run the following command and then we'll explore how to monitor and visualize the results of the session:
+Start by scoping the `ps` command:
 
 ```
 scope run -- ps -ef
@@ -304,3 +322,4 @@ Then, show only events containing the string `net_bytes`, and display the fields
 # scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
 [e91] Jul 12 02:15:41 curl net net.close net_bytes_sent:71 net_bytes_recv:8773
 ```
+

@@ -96,13 +96,22 @@ services:
       - 27017:27017
     <<: *scope-common
 
-  metriccapture:
-    image: ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+  node-glibc:
+    image: ghcr.io/criblio/appscope-test-node-glibc:${TAG:?Missing TAG environment variable}
     build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-node-glibc:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./metriccapture/Dockerfile
+      dockerfile: ./node/Dockerfile.glibc
+    <<: *scope-common
+
+  node-musl:
+    image: ghcr.io/criblio/appscope-test-node-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-node-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./node/Dockerfile.musl
     <<: *scope-common
 
   metricvariants:
@@ -128,7 +137,7 @@ services:
   java9:
     image: ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
     environment:
-        SKIP_LDSCOPE_TEST: 'true'
+        SKIP_SCOPE_TEST: 'true'
     build:
       cache_from: 
         - ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
@@ -201,6 +210,15 @@ services:
       dockerfile: ./service/Dockerfile.systemd
     <<: *scope-common
 
+  service-openrc:
+    image: ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.openrc
+    <<: *scope-common
+
   console:
     image: ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
     build:
@@ -217,6 +235,15 @@ services:
         - ghcr.io/criblio/appscope-test-musl:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./musl/Dockerfile
+    <<: *scope-common
+
+  opentelemetry:
+    image: ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./opentelemetry/Dockerfile
     <<: *scope-common
 
   glibc:
@@ -254,6 +281,18 @@ services:
       context: .
       dockerfile: ./cli/Dockerfile
     privileged: true
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
+      - ../..:/opt/appscope
+    <<: *scope-common
+
+  cli_rules:
+    image: ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./cli_rules/Dockerfile
     <<: *scope-common
 
   sshd:
@@ -264,4 +303,72 @@ services:
       context: .
       dockerfile: ./sshd/Dockerfile
     <<: *scope-common
+
+  payload-glibc:
+    image: ghcr.io/criblio/appscope-test-payload-glibc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-payload-glibc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./payload/Dockerfile.glibc
+    <<: *scope-common
+
+  payload-musl:
+    image: ghcr.io/criblio/appscope-test-payload-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-payload-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./payload/Dockerfile.musl
+    <<: *scope-common
+
+  postgres:
+    image: ghcr.io/criblio/appscope-test-postgres:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-postgres:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./postgres/Dockerfile
+    <<: *scope-common
+
+  jetty:
+    image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./jetty/Dockerfile
+    <<: *scope-common
+
+  jetty:
+    image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./jetty/Dockerfile
+    <<: *scope-common
+
+  go_19:
+    image: ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.19.9
+    <<: *scope-common
+
+  go_20:
+    image: ghcr.io/criblio/appscope-test-go_20:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_20:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.20.4
+    <<: *scope-common
+
 # vim: ts=2 sw=2 et :

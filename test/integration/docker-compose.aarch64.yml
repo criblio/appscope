@@ -5,8 +5,3 @@ x-scope-common: &scope-common
     - ../..:/opt/appscope
   working_dir: /opt/appscope
   privileged: true
-
-#services:
-
-  # These tests run only on aarch64
-

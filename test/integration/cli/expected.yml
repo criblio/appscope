@@ -64,16 +64,19 @@ event:
     field: .*
     value: .*
 libscope:
-  configevent: false
+  configevent: true
   summaryperiod: 10
   commanddir: /tmp/SESSIONPATH/cmd
   log:
     level: warning
     transport:
       type: file
-      path: /tmp/SESSIONPATH/ldscope.log
+      path: /tmp/SESSIONPATH/libscope.log
       buffering: line
       tls:
         enable: false
         validateserver: false
         cacertpath: ""
+  snapshot:
+    coredump: false
+    backtrace: false

@@ -278,11 +278,9 @@ void start_contentinfo(PKCS12_BUILDER *pb)
 
 void end_contentinfo(PKCS12_BUILDER *pb)
 {
-    if (pb->success) {
-        if (pb->bags && !TEST_true(PKCS12_add_safe(&pb->safes, pb->bags, -1, 0, NULL))) {
+    if (pb->success && pb->bags != NULL) {
+        if (!TEST_true(PKCS12_add_safe(&pb->safes, pb->bags, -1, 0, NULL)))
             pb->success = 0;
-            return;
-        }
     }
     sk_PKCS12_SAFEBAG_pop_free(pb->bags, PKCS12_SAFEBAG_free);
     pb->bags = NULL;
@@ -291,19 +289,16 @@ void end_contentinfo(PKCS12_BUILDER *pb)
 
 void end_contentinfo_encrypted(PKCS12_BUILDER *pb, const PKCS12_ENC *enc)
 {
-    if (pb->success) {
-        if (pb->bags) {
-            if (legacy) {
-                if (!TEST_true(PKCS12_add_safe(&pb->safes, pb->bags, enc->nid, enc->iter, enc->pass))) {
-                    pb->success = 0;
-                    return;
-                }
-            } else {
-                if (!TEST_true(PKCS12_add_safe_ex(&pb->safes, pb->bags, enc->nid, enc->iter, enc->pass, test_ctx, test_propq))) {
-                    pb->success = 0;
-                    return;
-                }
-            }
+    if (pb->success && pb->bags != NULL) {
+        if (legacy) {
+            if (!TEST_true(PKCS12_add_safe(&pb->safes, pb->bags, enc->nid,
+                                           enc->iter, enc->pass)))
+                pb->success = 0;
+        } else {
+            if (!TEST_true(PKCS12_add_safe_ex(&pb->safes, pb->bags, enc->nid,
+                                              enc->iter, enc->pass, test_ctx,
+                                              test_propq)))
+                pb->success = 0;
         }
     }
     sk_PKCS12_SAFEBAG_pop_free(pb->bags, PKCS12_SAFEBAG_free);
@@ -324,7 +319,6 @@ static STACK_OF(PKCS12_SAFEBAG) *decode_contentinfo(STACK_OF(PKCS7) *safes, int 
     if (enc) {
         if (!TEST_int_eq(bagnid, NID_pkcs7_encrypted))
             goto err;
-        /* TODO: Check algorithm (iterations?) against what we originally set */
         bags = PKCS12_unpack_p7encdata(p7, enc->pass, strlen(enc->pass));
     } else {
         if (!TEST_int_eq(bagnid, NID_pkcs7_data))
@@ -485,12 +479,15 @@ static int check_asn1_string(const ASN1_TYPE *av, const char *txt)
         break;
 
     case V_ASN1_UTF8STRING:
-        if (!TEST_str_eq(txt, (char *)av->value.utf8string->data))
+        if (!TEST_mem_eq(txt, strlen(txt), (char *)av->value.utf8string->data,
+                         av->value.utf8string->length))
             goto err;
         break;
 
     case V_ASN1_OCTET_STRING:
-        if (!TEST_str_eq(txt, (char *)av->value.octet_string->data))
+        if (!TEST_mem_eq(txt, strlen(txt),
+                         (char *)av->value.octet_string->data,
+                         av->value.octet_string->length))
             goto err;
         break;
 
@@ -523,8 +520,6 @@ static int check_attrs(const STACK_OF(X509_ATTRIBUTE) *bag_attrs, const PKCS12_A
         while(p_attr->oid != NULL) {
             /* Find a matching attribute type */
             if (strcmp(p_attr->oid, attr_txt) == 0) {
-
-                /* TODO: Handle multi-value attributes */
                 if (!TEST_int_eq(X509_ATTRIBUTE_count(attr), 1))
                     goto err;
 
@@ -608,8 +603,6 @@ void check_keybag(PKCS12_BUILDER *pb, const unsigned char *bytes, int len,
             pb->success = 0;
             goto err;
         }
-        /* TODO: handle key attributes */
-        /* PKCS8_pkey_get0_attrs(p8c); */
         break;
 
     case NID_pkcs8ShroudedKeyBag:
@@ -626,8 +619,6 @@ void check_keybag(PKCS12_BUILDER *pb, const unsigned char *bytes, int len,
             pb->success = 0;
             goto err;
         }
-        /* TODO: handle key attributes */
-        /* PKCS8_pkey_get0_attrs(p8); */
         PKCS8_PRIV_KEY_INFO_free(p8);
         break;
 

@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
+        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
         </p>
         <p>
           <b>Cribl allows for enriching events with index-time fields.</b> In this example, we're looking at web access logs and adding these index-time fields: <code>geo</code>, <code>dc</code>, and <code>rack</code>. Imagine these could come

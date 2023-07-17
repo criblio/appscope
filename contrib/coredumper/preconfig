@@ -1,0 +1,27 @@
+#!/bin/sh
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# Touch files.  Order definitely matters here!
+
+for f in configure.ac \
+         Makefile.am \
+         aclocal.m4 \
+         src/config.h.in \
+         ltmain.sh \
+         libtool \
+         config.guess \
+         config.sub \
+         Makefile.in \
+         configure; do
+    touch "$f"
+done
+
+echo "Done.  Run './configure && make' to compile."

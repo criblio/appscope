@@ -181,7 +181,9 @@ typedef struct {
     int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
+    sighandler_t (*signal)(int, sighandler_t);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
+    int (*raise)(int);
     void (*_exit)(int);
     int (*SSL_read)(SSL *, void *, int);
     int (*SSL_write)(SSL *, const void *, int);
@@ -280,6 +282,5 @@ typedef struct {
 extern interposed_funcs_t g_fn;
 
 void initFn(void);
-void initFn_musl(void);
 
 #endif // __FN_H__

@@ -66,7 +66,7 @@ endtest
 
 starttest cat_html
 
-ldscope cat docker/demo/nginx/html/index.html > /dev/null
+scope -z cat docker/demo/nginx/html/index.html > /dev/null
 evaltest
 
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
@@ -84,7 +84,7 @@ endtest
 starttest cat_binary
 
 export SCOPE_ALLOW_BINARY_CONSOLE=false
-ldscope cat /bin/bash > /dev/null
+scope -z cat /bin/bash > /dev/null
 unset SCOPE_ALLOW_BINARY_CONSOLE
 evaltest
 
@@ -101,7 +101,7 @@ endtest
 starttest cat_binary_with_ALLOW_BINARY_env
 
 export SCOPE_ALLOW_BINARY_CONSOLE=true
-ldscope cat /bin/bash > /dev/null
+scope -z cat /bin/bash > /dev/null
 unset SCOPE_ALLOW_BINARY_CONSOLE
 evaltest
 
@@ -126,7 +126,7 @@ export SCOPE_ALLOW_BINARY_CONSOLE=false
 
 starttest curl_png
 
-ldscope curl https://upload.wikimedia.org/wikipedia/commons/e/e9/Felis_silvestris_silvestris_small_gradual_decrease_of_quality.png --output - > /dev/null
+scope -z curl https://upload.wikimedia.org/wikipedia/commons/e/e9/Felis_silvestris_silvestris_small_gradual_decrease_of_quality.png --output - > /dev/null
 evaltest
 
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
@@ -140,7 +140,7 @@ endtest
 
 starttest trace_level_test
 
-SCOPE_LOG_LEVEL=trace ldscope ps -ef
+SCOPE_LOG_LEVEL=trace scope -z ps -ef
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
@@ -155,7 +155,7 @@ endtest
 
 starttest ls_with_color
 
-ldscope ls --color=always > /dev/null
+scope -z ls --color=always > /dev/null
 evaltest
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
@@ -170,7 +170,7 @@ endtest
 
 starttest hexdump
 
-ldscope hexdump /usr/local/scope/lib/libscope.so > /dev/null
+scope -z hexdump /usr/local/scope/lib/libscope.so > /dev/null
 evaltest
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
@@ -185,7 +185,7 @@ endtest
 
 starttest xxd
 
-ldscope xxd /usr/local/scope/lib/libscope.so > /dev/null
+scope -z xxd /usr/local/scope/lib/libscope.so > /dev/null
 evaltest
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
@@ -203,7 +203,7 @@ starttest tar_to_stdout
 cd /opt/tar_test
 tar -Pczvf test.tar.gz /usr/bin > /dev/null
 
-ldscope tar -PxOzf test.tar.gz > /dev/null
+scope -z tar -PxOzf test.tar.gz > /dev/null
 evaltest
 
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
@@ -217,7 +217,7 @@ endtest
 
 starttest group_user_name
 
-su --command="/usr/local/scope/bin/ldscope ls" test_user > /dev/null
+su --command="/usr/local/scope/bin/scope -z ls" test_user > /dev/null
 
 grep '"gid":1234,"groupname":"test_group","uid":3333,"username":"test_user"' $EVT_FILE > /dev/null
 ERR+=$?
@@ -261,7 +261,7 @@ git commit -m "message"
 
 starttest git_push_ssl_test
 
-ldscope git push --set-upstream origin master
+scope -z git push --set-upstream origin master
 
 evaltest
 
@@ -321,7 +321,7 @@ git commit -m "message"
 sleep 5
 starttest git_push_https_test
 
-ldscope /bin/dash -c "git push --set-upstream origin master"
+scope -z /bin/dash -c "git push --set-upstream origin master"
 
 sleep 5
 

@@ -46,7 +46,7 @@ To define a TLS-encrypted connection to Cribl Stream on Cribl.Cloud, just set th
 For example:
 
 ```
-SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
+SCOPE_CRIBL_CLOUD=tcp://in.main-default-<organization>.cribl.cloud:10090
 ```
 
 By default, Cribl.Cloud-managed instances of Cribl Stream have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in AppScope Source to receive data from AppScope. You can change the [AppScope Source configuration](https://docs.cribl.io/docs/sources-appscope), or create additional AppScope Sources, as needed.
@@ -67,6 +67,8 @@ Any configuration override is logged to AppScope's default log file.
 
 If you have events or metrics enabled (or disabled), they retain this setting. (Before v.1.0.0, both would be set to enabled, as an override). You still have control via environment variables or the config file.
 
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`. The `payload` [field](/docs/schema-reference/#eventstartmsginfoconfigurationcurrentpayload) in the process-start message records whether the feature is enabled or not, and if enabled, the directory to which it will write payloads.
+
 <span id="cloud-unencrypted"> </span>
 
 ### Connecting to Cribl Stream on Cribl.Cloud, Unencrypted 
@@ -76,7 +78,7 @@ To define an **unencrypted** connection to a Cribl.Cloud-managed instance of Cri
 For example:
 
 ```
-SCOPE_CRIBL=tcp://in.logstream.<cloud_instance>.cribl.cloud:10091
+SCOPE_CRIBL=tcp://in.main-default-<organization>.cribl.cloud:10091
 ```
 
 <span id="on-prem"> </span>

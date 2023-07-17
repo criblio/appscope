@@ -1,0 +1,3 @@
+allow:
+deny:
+- arg: git

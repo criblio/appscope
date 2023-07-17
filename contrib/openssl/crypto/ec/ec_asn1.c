@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -485,7 +485,7 @@ ECPKPARAMETERS *EC_GROUP_get_ecpkparameters(const EC_GROUP *group,
             ECPARAMETERS_free(ret->value.parameters);
     }
 
-    if (EC_GROUP_get_asn1_flag(group)) {
+    if (EC_GROUP_get_asn1_flag(group) == OPENSSL_EC_NAMED_CURVE) {
         /*
          * use the asn1 OID to describe the elliptic curve parameters
          */
@@ -687,6 +687,16 @@ EC_GROUP *EC_GROUP_new_from_ecparameters(const ECPARAMETERS *params)
 
     /* extract seed (optional) */
     if (params->curve->seed != NULL) {
+        /*
+         * This happens for instance with
+         * fuzz/corpora/asn1/65cf44e85614c62f10cf3b7a7184c26293a19e4a
+         * and causes the OPENSSL_malloc below to choke on the
+         * zero length allocation request.
+         */
+        if (params->curve->seed->length == 0) {
+            ERR_raise(ERR_LIB_EC, EC_R_ASN1_ERROR);
+            goto err;
+        }
         OPENSSL_free(ret->seed);
         if ((ret->seed = OPENSSL_malloc(params->curve->seed->length)) == NULL) {
             ERR_raise(ERR_LIB_EC, ERR_R_MALLOC_FAILURE);
@@ -699,7 +709,8 @@ EC_GROUP *EC_GROUP_new_from_ecparameters(const ECPARAMETERS *params)
 
     if (params->order == NULL
             || params->base == NULL
-            || params->base->data == NULL) {
+            || params->base->data == NULL
+            || params->base->length == 0) {
         ERR_raise(ERR_LIB_EC, EC_R_ASN1_ERROR);
         goto err;
     }
@@ -719,7 +730,7 @@ EC_GROUP *EC_GROUP_new_from_ecparameters(const ECPARAMETERS *params)
     }
 
     /* extract the order */
-    if ((a = ASN1_INTEGER_to_BN(params->order, a)) == NULL) {
+    if (ASN1_INTEGER_to_BN(params->order, a) == NULL) {
         ERR_raise(ERR_LIB_EC, ERR_R_ASN1_LIB);
         goto err;
     }
@@ -736,7 +747,7 @@ EC_GROUP *EC_GROUP_new_from_ecparameters(const ECPARAMETERS *params)
     if (params->cofactor == NULL) {
         BN_free(b);
         b = NULL;
-    } else if ((b = ASN1_INTEGER_to_BN(params->cofactor, b)) == NULL) {
+    } else if (ASN1_INTEGER_to_BN(params->cofactor, b) == NULL) {
         ERR_raise(ERR_LIB_EC, ERR_R_ASN1_LIB);
         goto err;
     }
@@ -965,6 +976,9 @@ EC_KEY *d2i_ECPrivateKey(EC_KEY **a, const unsigned char **in, long len)
         goto err;
     }
 
+    if (EC_GROUP_get_curve_name(ret->group) == NID_sm2)
+        EC_KEY_set_flags(ret, EC_FLAG_SM2_RANGE);
+
     EC_POINT_clear_free(ret->pub_key);
     ret->pub_key = EC_POINT_new(ret->group);
     if (ret->pub_key == NULL) {
@@ -1109,6 +1123,10 @@ EC_KEY *d2i_ECParameters(EC_KEY **a, const unsigned char **in, long len)
             ret->dirty_cnt++;
         return NULL;
     }
+
+    if (EC_GROUP_get_curve_name(ret->group) == NID_sm2)
+        EC_KEY_set_flags(ret, EC_FLAG_SM2_RANGE);
+
     ret->dirty_cnt++;
 
     if (a)
@@ -1215,7 +1233,8 @@ ECDSA_SIG *d2i_ECDSA_SIG(ECDSA_SIG **psig, const unsigned char **ppin, long len)
         sig->r = BN_new();
     if (sig->s == NULL)
         sig->s = BN_new();
-    if (ossl_decode_der_dsa_sig(sig->r, sig->s, ppin, (size_t)len) == 0) {
+    if (sig->r == NULL || sig->s == NULL
+        || ossl_decode_der_dsa_sig(sig->r, sig->s, ppin, (size_t)len) == 0) {
         if (psig == NULL || *psig == NULL)
             ECDSA_SIG_free(sig);
         return NULL;

@@ -13,6 +13,7 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "httpagg.h"
 #include "metriccapture.h"
@@ -163,7 +164,6 @@ destroyHttpMap(void *data)
     http_map *map = (http_map *)data;
 
     if (map->req) scope_free(map->req);
-    if (map->resp) scope_free(map->resp);
     if (map) scope_free(map);
 }
 
@@ -218,28 +218,7 @@ sendEvent(mtc_t *mtc, event_t *event)
     cmdSendEvent(g_ctl, event, getTime(), &g_proc);
 
     if (cmdSendMetric(mtc, event) == -1) {
-        scopeLogError("ERROR: sendEvent:cmdSendMetric");
-    }
-}
-
-static void
-destroyProto(protocol_info *proto)
-{
-    if (!proto) return;
-
-    /*
-     * for future reference;
-     * proto is freed as event in doEvent().
-     * post->data is the http header and is freed in destroyHttpMap()
-     * when the list entry is deleted.
-     */
-    if (proto->data) {
-        // comment above doesn't apply to HTTP/2 protocol events
-        if (proto->ptype == EVT_H2FRAME) {
-            http_post *post = (http_post *)proto->data;
-            scope_free(post->hdr);
-        }
-        scope_free(proto->data);
+        scopeLogDebug("sendEvent:cmdSendMetric");
     }
 }
 
@@ -495,6 +474,17 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         }
     }
 
+    if (hreport->clen != -1) {
+        char *length_str = "content_length";
+        if (hreport->ptype == EVT_HREQ) {
+            length_str = "http_request_content_length";
+        } else if (hreport->ptype == EVT_HRES) {
+            length_str = "http_response_content_length";
+        }
+        H_VALUE(fields[hreport->ix], length_str, hreport->clen, EVENT_ONLY_ATTR);
+        HTTP_NEXT_FLD(hreport->ix);
+    }
+
     return TRUE;
 }
 
@@ -537,7 +527,7 @@ static void
 doHttp1Header(protocol_info *proto)
 {
     if (!proto || !proto->data) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -545,18 +535,25 @@ doHttp1Header(protocol_info *proto)
     event_field_t fields[HTTP_MAX_FIELDS];
     http_report hreport;
     http_post *post = (http_post *)proto->data;
-    http_map *map;
+    http_map *map = lstFind(g_maplist, post->id);
 
-    if ((map = lstFind(g_maplist, post->id)) == NULL) {
-        // lazy open
+    // When requests come in, save them in a map to be paired
+    // with responses later.
+    if (proto->ptype == EVT_HREQ) {
+
+        if (map) {
+            DBG("Duplicate http1 request");
+            return;
+        }
+
         if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
-            destroyProto(proto);
+            DBG(NULL);
             return;
         }
 
         if (lstInsert(g_maplist, post->id, map) == FALSE) {
             destroyHttpMap(map);
-            destroyProto(proto);
+            DBG(NULL);
             return;
         }
 
@@ -565,8 +562,10 @@ doHttp1Header(protocol_info *proto)
 
         map->id = post->id;
         map->first_time = tv.tv_sec;
-        map->req = NULL;
-        map->req_len = 0;
+        map->start_time = post->start_duration;
+        map->req = (char *)post->hdr;
+        post->hdr = NULL;  // we're transferring ownership, map will free it
+        map->req_len = proto->len;
     }
 
     ssl = (post->ssl) ? "https" : "http";
@@ -582,28 +581,24 @@ doHttp1Header(protocol_info *proto)
      *
      *  Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
      */
-    if (proto->ptype == EVT_HREQ) {
-        map->start_time = post->start_duration;
-        map->req = (char *)post->hdr;
-        map->req_len = proto->len;
-    }
 
-    char header[map->req_len];
     // we're either building a new req or we have a previous req
-    if (map->req) {
-        if ((hreport.hreq = scope_calloc(1, map->req_len)) == NULL) {
+    char *tokenized_hreq = NULL;
+    if (map && map->req) {
+        tokenized_hreq = scope_calloc(1, map->req_len);
+        hreport.hreq = scope_calloc(1, map->req_len);
+        if (!tokenized_hreq || !hreport.hreq) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
         char *savea = NULL;
-        scope_strncpy(header, map->req, map->req_len);
+        scope_strncpy(tokenized_hreq, map->req, map->req_len);
 
-        char *headertok = scope_strtok_r(header, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hreq, "\r\n", &savea);
         if (!headertok) {
-            scope_free(hreport.hreq);
             scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
-            return;
+            goto out;
         }
 
         // The request specific values from Request-Line
@@ -644,16 +639,10 @@ doHttp1Header(protocol_info *proto)
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             httpFieldsInternal(fields, &hreport, proto);
 
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
-
             httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
+            cmdSendHttp(g_ctl, &sendEvent, post->id, &g_proc);
         }
     }
 
@@ -670,33 +659,32 @@ doHttp1Header(protocol_info *proto)
     *
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
+    char *tokenized_hres = NULL;
     if (proto->ptype == EVT_HRES) {
-        if ((hreport.hres = scope_calloc(1, proto->len)) == NULL) {
+
+        tokenized_hres = scope_calloc(1, proto->len);
+        hreport.hres = scope_calloc(1, proto->len);
+        if (!tokenized_hres || !hreport.hres) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
-        struct timeval tv;
-        scope_gettimeofday(&tv, NULL);
-
-        map->resp = (char *)post->hdr;
-
-        if (!map->req) {
-            map->duration = 0;
-        } else {
-            map->duration = getDurationNow(post->start_duration, map->start_time);
-            map->duration = map->duration / 1000000;
+        size_t request_clen = -1;
+        size_t response_clen = -1;
+        uint64_t duration = 0;
+        if (map) {
+            duration = getDurationNow(post->start_duration, map->start_time);
+            duration = duration / 1000000;
         }
 
         char *stext;
-        size_t status = getHttpStatus((char *)map->resp, proto->len, &stext);
+        size_t status = getHttpStatus((char *)post->hdr, proto->len, &stext);
 
         // The response specific values from Status-Line
         char *savea;
-        char reqheader[proto->len];
-        scope_strncpy(reqheader, map->resp, proto->len);
+        scope_strncpy(tokenized_hres, post->hdr, proto->len);
 
-        char *headertok = scope_strtok_r(reqheader, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hres, "\r\n", &savea);
         char *flavor_str = scope_strtok_r(headertok, " ", &savea);
         if (flavor_str &&
             ((flavor_str = scope_strtok_r(flavor_str, "/", &savea))) &&
@@ -719,40 +707,34 @@ doHttp1Header(protocol_info *proto)
         H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http_server_duration", map->duration, EVENT_ONLY_ATTR);
+        H_VALUE(fields[hreport.ix], "http_server_duration", duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        if (map->req) {
+        if (map && map->req) {
             hreport.ptype = EVT_HREQ;
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
+            request_clen = hreport.clen;
+
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
-        httpFieldsInternal(fields, &hreport, proto);
-        if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
-            HTTP_NEXT_FLD(hreport.ix);
-        }
+        httpFields(fields, &hreport, post->hdr, proto->len, proto, g_cfg.staticfg);
+        response_clen = hreport.clen;
 
+        httpFieldsInternal(fields, &hreport, proto);
         httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
+        cmdSendHttp(g_ctl, &hevent, post->id, &g_proc);
 
         // emit statsd metrics, if enabled.
         if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
 
             char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
-            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
+            event_t http_dur = INT_EVENT(mtx_name, duration, DELTA_MS, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
-            httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
+            httpAggAddMetric(g_http_agg, &http_dur, request_clen, response_clen);
 
             /* TBD AGG Only
             if (map->clen != -1) {
@@ -769,12 +751,16 @@ doHttp1Header(protocol_info *proto)
         }
 
         // Done; we remove the list entry; complete when reported
-        if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
+        if (map && (lstDelete(g_maplist, post->id) == FALSE)) {
+            DBG("Error deleting from g_maplist");
+        }
     }
 
+out:
+    if (tokenized_hreq) scope_free(tokenized_hreq);
+    if (tokenized_hres) scope_free(tokenized_hres);
     if (hreport.hreq) scope_free(hreport.hreq);
     if (hreport.hres) scope_free(hreport.hres);
-    destroyProto(proto);
 }
 
 static const char *
@@ -970,7 +956,7 @@ doHttp2Frame(protocol_info *proto)
     // require the protocol object and it's data pointer to be set
     if (!proto || !proto->data) {
         scopeLogError("ERROR: null proto or proto->data");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -978,7 +964,7 @@ doHttp2Frame(protocol_info *proto)
     http_post *post = (http_post *)proto->data;
     if (!post->hdr) {
         scopeLogError("ERROR: null post->hdr");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -988,7 +974,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
     uint32_t fLen    = (frame[0]<<16) + (frame[1]<<8) + (frame[2]);
     uint8_t  fType   = frame[3];
@@ -998,7 +984,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
 
     //scopeLogHexDebug(frame, proto->len,
@@ -1053,7 +1039,7 @@ doHttp2Frame(protocol_info *proto)
             if (!channel) {
                 scopeLogError("ERROR: failed to create channel info");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             lshpack_dec_init(&channel->decoder);
@@ -1064,7 +1050,7 @@ doHttp2Frame(protocol_info *proto)
                 destroyHttp2Channel(channel);
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1075,14 +1061,14 @@ doHttp2Frame(protocol_info *proto)
             if (!stream) {
                 scopeLogError("ERROR: failed to create http2Stream");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             if (lstInsert(channel->streams, fStream, stream) != TRUE) {
                 destroyHttp2Stream(stream);
                 scopeLogError("ERROR: failed to insert decoder");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1097,7 +1083,7 @@ doHttp2Frame(protocol_info *proto)
             if (!stream->jsonData) {
                 scopeLogError("ERROR: failed to create jsonData");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             // Hard coding 2.0 for now
@@ -1377,9 +1363,6 @@ doHttp2Frame(protocol_info *proto)
         scopeLogError("ERROR: HTTP/2 unexpected frame type; type=0x%02d", fType);
         DBG(NULL);
     }
-
-cleanup:
-    destroyProto(proto);
 }
 
 static void
@@ -1391,7 +1374,7 @@ doDetection(protocol_info *proto)
 
     protname = (char *)proto->data;
     if (!protname) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -1407,7 +1390,6 @@ doDetection(protocol_info *proto)
     event_t evt = INT_EVENT("net.app", proto->fd, SET, fields);
     evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
-    destroyProto(proto);
 }
 
 void
@@ -1512,7 +1494,7 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t netErrMetric = INT_EVENT("net.error", value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &netErrMetric)) {
-            scopeLogError("ERROR: doErrorMetric:NET:cmdSendMetric");
+            scopeLogDebug("doErrorMetric:NET:cmdSendMetric");
         }
         atomicSwapU64(&value->mtc, 0);
         break;
@@ -1601,7 +1583,7 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t fsErrMetric = INT_EVENT(metric, value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &fsErrMetric)) {
-            scopeLogError("ERROR: doErrorMetric:FS_ERR:cmdSendMetric");
+            scopeLogDebug("doErrorMetric:FS_ERR:cmdSendMetric");
         }
         atomicSwapU64(&value->mtc, 0);
         break;
@@ -1691,7 +1673,7 @@ doDNSMetricName(metric_t type, net_info *net)
         };
         event_t dnsMetric = INT_EVENT("dns.req", ctrs->numDNS.mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &dnsMetric)) {
-            scopeLogError("ERROR: doDNSMetricName:DNS:cmdSendMetric");
+            scopeLogDebug("doDNSMetricName:DNS:cmdSendMetric");
         }
         break;
     }
@@ -1757,7 +1739,7 @@ doDNSMetricName(metric_t type, net_info *net)
         };
         event_t dnsDurMetric = INT_EVENT("dns.duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &dnsDurMetric)) {
-            scopeLogError("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric");
+            scopeLogDebug("doDNSMetricName:DNS_DURATION:cmdSendMetric");
         }
         atomicSwapU64(&ctrs->dnsDurationNum.mtc, 0);
         atomicSwapU64(&ctrs->dnsDurationTotal.mtc, 0);
@@ -1929,7 +1911,7 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
 
     event_t evt = INT_EVENT("fs.stat", ctrs->numStat.mtc, DELTA, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLogError("doStatMetric");
+        scopeLogDebug("doStatMetric");
     }
 }
 
@@ -2292,7 +2274,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
         event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLogError("fd:%d ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fs->fd);
+            scopeLogDebug("fd:%d doFSMetric:FS_DURATION:cmdSendMetric", fs->fd);
         }
 
         // Reset the info if we tried to report
@@ -2317,14 +2299,14 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 numops = &fs->numRead;
                 sizebytes = &fs->readBytes;
                 global_counter = &g_ctrs.readBytes;
-                err_str = "ERROR: doFSMetric:FS_READ:cmdSendMetric";
+                err_str = "doFSMetric:FS_READ:cmdSendMetric";
                 break;
             case FS_WRITE:
                 metric = "fs.write";
                 numops = &fs->numWrite;
                 sizebytes = &fs->writeBytes;
                 global_counter = &g_ctrs.writeBytes;
-                err_str = "ERROR: doFSMetric:FS_WRITE:cmdSendMetric";
+                err_str = "doFSMetric:FS_WRITE:cmdSendMetric";
                 break;
             default:
                 DBG(NULL);
@@ -2376,7 +2358,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         event_t rwMetric = INT_EVENT(metric, sizebytes->mtc, DELTA, fields);
 
         if (cmdSendMetric(g_mtc, &rwMetric)) {
-            scopeLogError("fd:%d %s", fs->fd, err_str);
+            scopeLogDebug("fd:%d %s", fs->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, sizebytes->mtc);
         atomicSwapU64(&numops->mtc, 0);
@@ -2400,21 +2382,21 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 numops = &fs->numOpen;
                 global_counter = &g_ctrs.numOpen;
                 summarize = &g_summary.fs.open_close;
-                err_str = "ERROR: doFSMetric:FS_OPEN:cmdSendMetric";
+                err_str = "doFSMetric:FS_OPEN:cmdSendMetric";
                 break;
             case FS_CLOSE:
                 metric = "fs.close";
                 numops = &fs->numClose;
                 global_counter = &g_ctrs.numClose;
                 summarize = &g_summary.fs.open_close;
-                err_str = "ERROR: doFSMetric:FS_CLOSE:cmdSendMetric";
+                err_str = "doFSMetric:FS_CLOSE:cmdSendMetric";
                 break;
             case FS_SEEK:
                 metric = "fs.seek";
                 numops = &fs->numSeek;
                 global_counter = &g_ctrs.numSeek;
                 summarize = &g_summary.fs.seek;
-                err_str = "ERROR: doFSMetric:FS_SEEK:cmdSendMetric";
+                err_str = "doFSMetric:FS_SEEK:cmdSendMetric";
                 break;
             default:
                 DBG(NULL);
@@ -2463,7 +2445,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         event_t evt = INT_EVENT(metric, numops->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLogError("fd:%d %s", fs->fd, err_str);
+            scopeLogDebug("fd:%d %s", fs->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, numops->mtc);
         atomicSwapU64(&numops->mtc, 0);
@@ -2513,12 +2495,12 @@ doTotalNetRxTx(metric_t type)
         case TOT_RX:
             metric = "net.rx";
             value = &g_ctrs.netrxBytes;
-            err_str = "ERROR: doTotal:TOT_RX:cmdSendMetric";
+            err_str = "doTotal:TOT_RX:cmdSendMetric";
             break;
         case TOT_TX:
             metric = "net.tx";
             value = &g_ctrs.nettxBytes;
-            err_str = "ERROR: doTotal:TOT_TX:cmdSendMetric";
+            err_str = "doTotal:TOT_TX:cmdSendMetric";
             break;
         default:
             DBG(NULL);
@@ -2544,7 +2526,7 @@ doTotalNetRxTx(metric_t type)
             };
             event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
             if (cmdSendMetric(g_mtc, &evt)) {
-                scopeLogError("%s", err_str);
+                scopeLogDebug("%s", err_str);
             }
         }
 
@@ -2568,14 +2550,14 @@ doTotal(metric_t type)
                 return;
             metric = "fs.read";
             value = &g_ctrs.readBytes;
-            err_str = "ERROR: doTotal:TOT_READ:cmdSendMetric";
+            err_str = "doTotal:TOT_READ:cmdSendMetric";
             break;
         case TOT_WRITE:
             if (!g_summary.fs.read_write || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
                 return;
             metric = "fs.write";
             value = &g_ctrs.writeBytes;
-            err_str = "ERROR: doTotal:TOT_WRITE:cmdSendMetric";
+            err_str = "doTotal:TOT_WRITE:cmdSendMetric";
             break;
         case TOT_RX:
         case TOT_TX:
@@ -2588,7 +2570,7 @@ doTotal(metric_t type)
                 return;
             metric = "fs.seek";
             value = &g_ctrs.numSeek;
-            err_str = "ERROR: doTotal:TOT_SEEK:cmdSendMetric";
+            err_str = "doTotal:TOT_SEEK:cmdSendMetric";
             units = "operation";
             break;
         case TOT_STAT:
@@ -2596,7 +2578,7 @@ doTotal(metric_t type)
                 return;
             metric = "fs.stat";
             value = &g_ctrs.numStat;
-            err_str = "ERROR: doTotal:TOT_STAT:cmdSendMetric";
+            err_str = "doTotal:TOT_STAT:cmdSendMetric";
             units = "operation";
             break;
         case TOT_OPEN:
@@ -2604,7 +2586,7 @@ doTotal(metric_t type)
                 return;
             metric = "fs.open";
             value = &g_ctrs.numOpen;
-            err_str = "ERROR: doTotal:TOT_OPEN:cmdSendMetric";
+            err_str = "doTotal:TOT_OPEN:cmdSendMetric";
             units = "operation";
             break;
         case TOT_CLOSE:
@@ -2612,7 +2594,7 @@ doTotal(metric_t type)
                 return;
             metric = "fs.close";
             value = &g_ctrs.numClose;
-            err_str = "ERROR: doTotal:TOT_CLOSE:cmdSendMetric";
+            err_str = "doTotal:TOT_CLOSE:cmdSendMetric";
             units = "operation";
             break;
         case TOT_DNS:
@@ -2620,7 +2602,7 @@ doTotal(metric_t type)
                 return;
             metric = "dns.req";
             value = &g_ctrs.numDNS;
-            err_str = "ERROR: doTotal:TOT_DNS:cmdSendMetric";
+            err_str = "doTotal:TOT_DNS:cmdSendMetric";
             units = "request";
             break;
         case TOT_PORTS:
@@ -2628,7 +2610,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.port";
             value = &g_ctrs.openPorts;
-            err_str = "ERROR: doTotal:TOT_PORTS:cmdSendMetric";
+            err_str = "doTotal:TOT_PORTS:cmdSendMetric";
             units = "instance";
             aggregation_type = CURRENT;
             break;
@@ -2637,7 +2619,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.tcp";
             value = &g_ctrs.netConnectionsTcp;
-            err_str = "ERROR: doTotal:TOT_TCP_CONN:cmdSendMetric";
+            err_str = "doTotal:TOT_TCP_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
@@ -2646,7 +2628,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.udp";
             value = &g_ctrs.netConnectionsUdp;
-            err_str = "ERROR: doTotal:TOT_UDP_CONN:cmdSendMetric";
+            err_str = "doTotal:TOT_UDP_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
@@ -2655,7 +2637,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.other";
             value = &g_ctrs.netConnectionsOther;
-            err_str = "ERROR: doTotal:TOT_OTHER_CONN:cmdSendMetric";
+            err_str = "doTotal:TOT_OTHER_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
@@ -2664,7 +2646,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.open";
             value = &g_ctrs.netConnOpen;
-            err_str = "ERROR: doTotal:TOT_NET_OPEN:cmdSendMetric";
+            err_str = "doTotal:TOT_NET_OPEN:cmdSendMetric";
             units = "connection";
             break;
         case TOT_NET_CLOSE:
@@ -2672,7 +2654,7 @@ doTotal(metric_t type)
                 return;
             metric = "net.close";
             value = &g_ctrs.netConnClose;
-            err_str = "ERROR: doTotal:TOT_NET_CLOSE:cmdSendMetric";
+            err_str = "doTotal:TOT_NET_CLOSE:cmdSendMetric";
             units = "connection";
             break;
         default:
@@ -2693,7 +2675,7 @@ doTotal(metric_t type)
     };
     event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLogError("%s", err_str);
+        scopeLogDebug("%s", err_str);
     }
 
     // Reset the info we tried to report (if it's not a gauge)
@@ -2720,7 +2702,7 @@ doTotalDuration(metric_t type)
             aggregation_type = HISTOGRAM;
             units = "microsecond";
             factor = 1000;
-            err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:cmdSendMetric";
+            err_str = "doTotalDuration:TOT_FS_DURATION:cmdSendMetric";
             break;
         case TOT_NET_DURATION:
             if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
@@ -2731,7 +2713,7 @@ doTotalDuration(metric_t type)
             aggregation_type = DELTA_MS;
             units = "millisecond";
             factor = 1000000;
-            err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:cmdSendMetric";
+            err_str = "doTotalDuration:TOT_NET_DURATION:cmdSendMetric";
             break;
         case TOT_DNS_DURATION:
             if (!g_summary.net.dns || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_DNS)))
@@ -2742,7 +2724,7 @@ doTotalDuration(metric_t type)
             aggregation_type = DELTA_MS;
             units = "millisecond";
             factor = 1000000;
-            err_str = "ERROR: doTotalDuration:TOT_DNS_DURATION:cmdSendMetric";
+            err_str = "doTotalDuration:TOT_DNS_DURATION:cmdSendMetric";
             break;
         default:
             DBG(NULL);
@@ -2769,7 +2751,7 @@ doTotalDuration(metric_t type)
     };
     event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLogError("%s", err_str);
+        scopeLogDebug("%s", err_str);
     }
 
     // Reset the info we tried to report
@@ -2803,7 +2785,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             metric = "net.port";
             value = &net->counters.openPorts;
             units = "instance";
-            err_str = "ERROR: doNetMetric:OPEN_PORTS:cmdSendMetric";
+            err_str = "doNetMetric:OPEN_PORTS:cmdSendMetric";
             break;
         case NET_CONNECTIONS:
             if (net->type == SOCK_STREAM) {
@@ -2817,7 +2799,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 value = &g_ctrs.netConnectionsOther;
             }
             units = "connection";
-            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:cmdSendMetric";
+            err_str = "doNetMetric:NET_CONNECTIONS:cmdSendMetric";
             break;
         default:
             DBG(NULL);
@@ -2850,7 +2832,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
         event_t evt = INT_EVENT(metric, value->mtc, CURRENT, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLogError("fd:%d %s", net->fd, err_str);
+            scopeLogDebug("fd:%d %s", net->fd, err_str);
         }
         // Don't reset the info if we tried to report.  It's a gauge.
         // atomicSwapU64(value, 0);
@@ -2871,7 +2853,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
         const char* metric = "net.open";
         const char* units = "connection";
-        const char* err_str = "ERROR: doNetMetric:CONNECTION_OPEN:cmdSendMetric";
+        const char* err_str = "doNetMetric:CONNECTION_OPEN:cmdSendMetric";
         counters_element_t* value = &net->counters.netConnOpen;
         counters_element_t* global_counter = &g_ctrs.netConnOpen;
         event_field_t fields[] = {
@@ -2888,7 +2870,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Report the net open metric
         event_t evt = INT_EVENT(metric, value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLogError("fd:%d %s", net->fd, err_str);
+            scopeLogDebug("fd:%d %s", net->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, value->mtc);
         atomicSwapU64(&value->mtc, 0);
@@ -2907,7 +2889,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Report the net close metric
         const char* metric = "net.close";
         const char* units = "connection";
-        const char* err_str = "ERROR: doNetMetric:CONNECTION_CLOSE:cmdSendMetric";
+        const char* err_str = "doNetMetric:CONNECTION_CLOSE:cmdSendMetric";
         counters_element_t* value = &net->counters.netConnClose;
         counters_element_t* global_counter = &g_ctrs.netConnClose;
         event_field_t mtc_fields[] = {
@@ -2922,7 +2904,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         };
         event_t mtc_evt = INT_EVENT(metric, value->mtc, DELTA, mtc_fields);
         if (cmdSendMetric(g_mtc, &mtc_evt)) {
-            scopeLogError("fd:%d %s", net->fd, err_str);
+            scopeLogDebug("fd:%d %s", net->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, value->mtc);
         atomicSwapU64(&value->mtc, 0);
@@ -3008,7 +2990,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         };
         event_t evt = INT_EVENT("net.duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLogError("fd:%d ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd);
+            scopeLogDebug("fd:%d doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd);
         }
         atomicSwapU64(&net->numDuration.mtc, 0);
         atomicSwapU64(&net->totalDuration.mtc, 0);
@@ -3135,7 +3117,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.mtc, DELTA, rxFields);
         scope_memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &rxMetric)) {
-            scopeLogError("ERROR: doNetMetric:NETRX:cmdSendMetric");
+            scopeLogDebug("doNetMetric:NETRX:cmdSendMetric");
         }
 
         // Reset the info if we tried to report
@@ -3263,7 +3245,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.mtc, DELTA, txFields);
         scope_memmove(&txMetric, &txNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &txMetric)) {
-            scopeLogError("ERROR: doNetMetric:NETTX:cmdSendMetric");
+            scopeLogDebug("doNetMetric:NETTX:cmdSendMetric");
         }
 
         // Reset the info if we tried to report
@@ -3490,7 +3472,7 @@ reportCapturedMetric(const captured_metric_t *metric)
 
     out_mtc.capturedFields = capturedFields;
     if (cmdSendMetric(g_mtc, &out_mtc)) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: reportCapturedMetric:cmdSendMetric");
+        scopeLogDebug("reportCapturedMetric:cmdSendMetric");
     }
 
 out:
@@ -3534,10 +3516,15 @@ doHttpAgg()
     httpAggReset(g_http_agg);
 }
 
+// Somewhat arbitrary value. Heuristically, on one machine,
+// this seemed adequate for our ipc to remain responsive.
+#define MAX_EVT_COUNT ( DEFAULT_MAXEVENTSPERSEC / 20 )
+
 void
 doEvent()
 {
     uint64_t data;
+    uint64_t eventCount = 0;
 
     if (doConnection() == FALSE) return;
 
@@ -3573,10 +3560,19 @@ doEvent()
                 doSecurityMetric(sec);
             } else {
                 DBG(NULL);
-                return;
             }
 
-            scope_free(event);
+            evtFree(event);
+
+        }
+
+        // If the datapath adds messages faster than we can consume them,
+        // we can starve other processing we need to do on this thread:
+        // payloads, logfiles/console, metrics, ipc, etc.  Don't allow
+        // this loop to go forever.
+        if (!ctlProcessAllQueuedEventsNow(g_ctl) &&
+            (eventCount++ >= MAX_EVT_COUNT)) {
+            break;
         }
     }
     reportAllCapturedMetrics();
@@ -3589,8 +3585,9 @@ doPayload()
 {
     uint64_t data;
 
-    // if LS enabled, then check for a connection
-    if (cfgLogStreamEnable(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
+    // initCtl() controls whether a CFG_LS transport exists.
+    // If it doesn't exist, ctlNeedsConnection will be FALSE.
+    if (ctlNeedsConnection(g_ctl, CFG_LS)) {
         if (ctlConnect(g_ctl, CFG_LS)) {
             reportProcessStart(g_ctl, FALSE, CFG_LS);
         } else {
@@ -3689,8 +3686,8 @@ doPayload()
             }
 
             char *bdata = NULL;
-
-            if (cfgLogStreamEnable(g_cfg.staticfg)) {
+            payload_status_t payStatus = ctlPayStatus(g_ctl);
+            if (payStatus == PAYLOAD_STATUS_CRIBL) {
                 bdata = scope_calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     scope_memmove(bdata, pay, hlen);
@@ -3698,7 +3695,7 @@ doPayload()
                     scope_memmove(&bdata[hlen], pinfo->data, pinfo->len);
                     cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
-            } else if (ctlPayDir(g_ctl)) {
+            } else if (payStatus == PAYLOAD_STATUS_DISK) {
                 int fd;
                 char path[PATH_MAX];
 

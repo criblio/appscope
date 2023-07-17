@@ -146,6 +146,14 @@ evtFree(evt_type *event)
             evtProtoFree(proto);
             break;
         }
+        case EVT_SEC:
+        {
+            // Alloc'd in gotSecurity, funcSecurity, fileSecurity
+            // netSecurity, dnsSecurity, envSecurity
+            // security_info_t *sec = (security_info_t *)event;
+            scope_free(event);
+            break;
+        }
         default:
             DBG(NULL);
             scope_free(event);

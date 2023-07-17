@@ -2048,7 +2048,7 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         char *fname = sym[ELF64_R_SYM(rel[i].r_info)].st_name + str;
         uint64_t got_addr = rel[i].r_offset + lm->l_addr;
         uint64_t got_value = *((uint64_t *)got_addr);
-        if (!fname) continue;
+        if (!fname || !got_value) continue;
 
         // Ignore got values that are resolved within it's own library.
         // These seem to be one of these two cases that aren't interesting:
@@ -2056,7 +2056,7 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         //   locally defined external symbols (resolve to text section)
         char *file_from_maps_file = fileNameFromAddr(got_value);
         char *file_from_link_map = scope_realpath(info->dlpi_name, NULL);
-        int found_locally = file_from_link_map && !strcmp(file_from_maps_file, file_from_link_map);
+        int found_locally = file_from_link_map && !scope_strcmp(file_from_maps_file, file_from_link_map);
         if (found_locally) goto next;
 
         // get info that comes from libdl
@@ -2067,24 +2067,24 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
 
         // If the function name and address from the link map matches
         // the function name and address from dladdr1 info, continue on.
-        if (dl_info.dli_sname && !strcmp(fname, dl_info.dli_sname) &&
+        if (dl_info.dli_sname && !scope_strcmp(fname, dl_info.dli_sname) &&
             ((void*)got_value == dl_info.dli_saddr)) goto next;
 
         // For now, ignore stuff from libc.  Reasons include:
         //   name missmatches that aren't meaningful free->cfree, calloc->__libc_calloc, etc.
         //   libdl doesn't know about libc's vectorized functions (sse2, sse42, avx, avx2)
         //     examples include: memcmp memmove strlen strncasecmp strncmp
-        if (strstr(file_from_maps_file, "/libc-")) goto next;
-        if (strstr(file_from_maps_file, "/libc.")) goto next;
+        if (scope_strstr(file_from_maps_file, "/libc-")) goto next;
+        if (scope_strstr(file_from_maps_file, "/libc.")) goto next;
 
         // For now, ignore stuff from vdso.  Reasons include:
         //   name missmatches that aren't meaningful gettimeofday->__vdso_gettimeofday
         //   libc link map has blank fnames for __vdso_time, __vdso_gettimeofday
-        if (!strcmp(file_from_maps_file, "[vdso]")) goto next;
+        if (!scope_strcmp(file_from_maps_file, "[vdso]")) goto next;
 
         // For now, ignore stuff from libpthread.
         //   name missmatches that aren't meaningful __pthread_barrier_init->pthread_barrier_init
-        if (strstr(file_from_maps_file, "/libpthread")) goto next;
+        if (scope_strstr(file_from_maps_file, "/libpthread")) goto next;
 
         const char *exe_or_lib_name = info->dlpi_name[0] ? info->dlpi_name : g_proc.procname;
         gotSecurity(fname, exe_or_lib_name, file_from_maps_file);

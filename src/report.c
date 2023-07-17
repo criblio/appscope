@@ -3279,7 +3279,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 void
 doSecurityMetric(security_info_t *sec)
 {
-    if (strlen(sec->dlpi_name) > 0) {
+    if (scope_strlen(sec->dlpi_name) > 0) {
         event_field_t fields[] = {
             STRFIELD("function", sec->func, 4, TRUE),
             STRFIELD("redirected_from", sec->dlpi_name, 4, TRUE),
@@ -3293,7 +3293,7 @@ doSecurityMetric(security_info_t *sec)
         event_t event = INT_EVENT("security.func_hook", 1, CURRENT, fields);
         event.src = CFG_SRC_SEC;
         sendEvent(g_mtc, &event);
-    } else if (strlen(sec->host) > 0) {
+    } else if (scope_strlen(sec->host) > 0) {
         event_field_t fields[] = {
             STRFIELD("host", sec->host, 4, TRUE),
             PROC_FIELD(g_proc.procname),
@@ -3305,7 +3305,7 @@ doSecurityMetric(security_info_t *sec)
         event_t event = INT_EVENT("security.connection", 1, CURRENT, fields);
         event.src = CFG_SRC_SEC;
         sendEvent(g_mtc, &event);
-    } else if (strlen(sec->dnsName) > 0) {
+    } else if (scope_strlen(sec->dnsName) > 0) {
         event_field_t fields[] = {
             STRFIELD("dns_name", sec->dnsName, 4, TRUE),
             PROC_FIELD(g_proc.procname),
@@ -3317,7 +3317,7 @@ doSecurityMetric(security_info_t *sec)
         event_t event = INT_EVENT("security.dns_malformed", 1, CURRENT, fields);
         event.src = CFG_SRC_SEC;
         sendEvent(g_mtc, &event);
-    } else if (strlen(sec->path) > 0) {
+    } else if (scope_strlen(sec->path) > 0) {
         if (sec->write_bytes > 0) {
             event_field_t fields[] = {
                 STRFIELD("file", sec->path, 4, TRUE),
@@ -3344,7 +3344,7 @@ doSecurityMetric(security_info_t *sec)
             event.src = CFG_SRC_SEC;
             sendEvent(g_mtc, &event);
         }
-    } else if (strlen(sec->func) > 0) {
+    } else if (scope_strlen(sec->func) > 0) {
         event_field_t fields[] = {
             STRFIELD("function", sec->func, 4, TRUE),
             PROC_FIELD(g_proc.procname),

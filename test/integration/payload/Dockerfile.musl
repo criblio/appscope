@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add bash curl htop
+RUN apk add bash curl bind htop
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh

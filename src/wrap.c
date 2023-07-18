@@ -3492,6 +3492,38 @@ isAnAppScopeConnection(int fd)
 }
 
 /*
+ * Process the sedmmmsg depending on return status of operation
+ * and value of msgvec
+ */
+static void
+scopeProcessSendmmsg(int sockfd, struct mmsghdr *msgvec, int rc) {
+    if (rc != -1) {
+        if (msgvec) {
+            scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+            if (!sockIsTCP(sockfd)) {
+                if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+            }
+
+            if (remotePortIsDNS(sockfd)) {
+                getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
+            }
+
+            doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+        }
+    } else {
+        setRemoteClose(sockfd, errno);
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmmsg", "nopath");
+    }
+}
+/*
  * Note:
  * The syscall function in libc is called from the loader for
  * at least mmap, possibly more. The result is that we can not
@@ -3539,6 +3571,18 @@ wrap_scope_syscall(long number, ...)
         }
         return rc;
     }
+    case SYS_sendmmsg:
+    {
+        long rc;
+        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
+                          fArgs.arg[2], fArgs.arg[3]);
+        if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) {
+            return rc;
+        }
+
+        scopeProcessSendmmsg((int)fArgs.arg[0], (struct mmsghdr *) fArgs.arg[1], rc);
+        return rc;
+    }
 
     /*
      * These messages are in place as they represent
@@ -3546,11 +3590,8 @@ wrap_scope_syscall(long number, ...)
      * These are functions defined in libuv/src/unix/linux-syscalls.c
      * that we are otherwise interposing. The DBG call allows us to
      * check to see how many of these are called and therefore
-     * what we are missing. So far, we only see accept4 used.
+     * what we are missing. So far, we only see accept4/sendmmsg used.
      */
-    case SYS_sendmmsg:
-        //DBG("syscall-sendmsg");
-        break;
 
     case SYS_recvmmsg:
         //DBG("syscall-recvmsg");
@@ -5384,39 +5425,41 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
-        size_t msg_iovlen_orig;
-        size_t msg_controllen_orig;
-        struct msghdr *msg_modify = (struct msghdr *)msg;
+        if (msg) {
+            size_t msg_iovlen_orig;
+            size_t msg_controllen_orig;
+            struct msghdr *msg_modify = (struct msghdr *)msg;
 
-        scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
+            scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
 
-        // For UDP connections the msg is a remote addr
-        if (msg && !sockIsTCP(sockfd)) {
-            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            // For UDP connections the msg is a remote addr
+            if (!sockIsTCP(sockfd)) {
+                if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
             }
-        }
 
-        if (g_ismusl == TRUE) {
-            msg_iovlen_orig = msg->msg_iovlen;
-            msg_modify->msg_iovlen &= 0xFFFFFFFF;
-            msg_controllen_orig = msg->msg_controllen;
-            msg_modify->msg_controllen &= 0xFFFFFFFF;
-        }
+            if (g_ismusl == TRUE) {
+                msg_iovlen_orig = msg->msg_iovlen;
+                msg_modify->msg_iovlen &= 0xFFFFFFFF;
+                msg_controllen_orig = msg->msg_controllen;
+                msg_modify->msg_controllen &= 0xFFFFFFFF;
+            }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
-        }
+            if (remotePortIsDNS(sockfd)) {
+                getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
+            }
 
-        doSend(sockfd, rc, msg, rc, MSG);
+            doSend(sockfd, rc, msg, rc, MSG);
 
-        if (g_ismusl == TRUE) {
-            msg_modify->msg_iovlen = msg_iovlen_orig;
-            msg_modify->msg_controllen = msg_controllen_orig;
+            if (g_ismusl == TRUE) {
+                msg_modify->msg_iovlen = msg_iovlen_orig;
+                msg_modify->msg_controllen = msg_controllen_orig;
+            }
         }
     } else {
         setRemoteClose(sockfd, errno);
@@ -5435,33 +5478,11 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     WRAP_CHECK(sendmmsg, -1);
 
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
-    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return rc;
-
-    if (rc != -1) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
-        if (!sockIsTCP(sockfd)) {
-            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
-            }
-        }
-
-        if (remotePortIsDNS(sockfd)) {
-            getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
-        }
-
-        doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
-
-    } else {
-        setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmmsg", "nopath");
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) {
+        return rc;
     }
 
+    scopeProcessSendmmsg(sockfd, msgvec, rc);
     return rc;
 }
 
@@ -5635,38 +5656,38 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     if (flags & MSG_PEEK) return rc;
 
     if (rc != -1) {
-        size_t msg_iovlen_orig;
-        size_t msg_controllen_orig;
-        scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
         if (msg) {
-            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            size_t msg_iovlen_orig;
+            size_t msg_controllen_orig;
+            scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+                if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+
+            if (g_ismusl == TRUE) {
+                msg_iovlen_orig = msg->msg_iovlen;
+                msg->msg_iovlen &= 0xFFFFFFFF;
+                msg_controllen_orig = msg->msg_controllen;
+                msg->msg_controllen &= 0xFFFFFFFF;
             }
-        }
 
-        if (g_ismusl == TRUE) {
-            msg_iovlen_orig = msg->msg_iovlen;
-            msg->msg_iovlen &= 0xFFFFFFFF;
-            msg_controllen_orig = msg->msg_controllen;
-            msg->msg_controllen &= 0xFFFFFFFF;
-        }
+            if (remotePortIsDNS(sockfd)) {
+                getDNSAnswer(sockfd, (char *)msg, rc, MSG);
+            }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSAnswer(sockfd, (char *)msg, rc, MSG);
-        }
+            doRecv(sockfd, rc, msg, rc, MSG);
+            doAccessRights(msg);
 
-        doRecv(sockfd, rc, msg, rc, MSG);
-        doAccessRights(msg);
-
-        if (g_ismusl == TRUE) {
-            msg->msg_iovlen = msg_iovlen_orig;
-            msg->msg_controllen = msg_controllen_orig;
+            if (g_ismusl == TRUE) {
+                msg->msg_iovlen = msg_iovlen_orig;
+                msg->msg_controllen = msg_controllen_orig;
+            }
         }
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmsg", "nopath");
@@ -5690,25 +5711,25 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
     if (flags & MSG_PEEK) return rc;
 
     if (rc != -1) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
         if (msgvec) {
-            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+                if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+
+            if (remotePortIsDNS(sockfd)) {
+                getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
             }
-        }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
+            doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+            doAccessRights(&msgvec->msg_hdr);
         }
-
-        doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
-        doAccessRights(&msgvec->msg_hdr);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmmsg", "nopath");
     }

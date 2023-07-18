@@ -21,6 +21,8 @@ To obtain the MD5 checksum for any file above, add `.md5` to the file path.
 
 Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.4.1`.
 
+Cribl's AppScope Helm Chart is available here: [https://github.com/criblio/helm-charts/tree/master/helm-chart-sources/appscope](https://github.com/criblio/helm-charts/tree/master/helm-chart-sources/appscope)
+
 ### New Features and Improvements
 
 Beginning in version 1.4.1, AppScope applies Rules to new processes in existing containers. That is, within any container that exists when you start scoping by Rule, AppScope will automatically begin monitoring any **new** process that matches the Rule. 

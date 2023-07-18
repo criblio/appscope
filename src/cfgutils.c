@@ -311,7 +311,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 }
 
 static regex_t*
-envRegex()
+envRegex(void)
 {
     if (g_regex) return g_regex;
 
@@ -2823,7 +2823,7 @@ initEvtFormat(config_t *cfg)
 }
 
 static bool
-protocolDefinitionsUsePayloads()
+protocolDefinitionsUsePayloads(void)
 {
     bool retVal = FALSE;
     protocol_def_t *protoDef = NULL;

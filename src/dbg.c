@@ -42,7 +42,7 @@ bool g_issighandler = FALSE;
 char g_libpath[PATH_MAX] = {};
 
 void
-dbgInit()
+dbgInit(void)
 {
     dbgDestroy();
 
@@ -104,7 +104,7 @@ resetLine(line_t *line)
 }
 
 void
-dbgDestroy()
+dbgDestroy(void)
 {
      if (!g_dbg) return;
 
@@ -119,7 +119,7 @@ dbgDestroy()
 
 // Accessors
 unsigned long long
-dbgCountAllLines()
+dbgCountAllLines(void)
 {
     if (!g_dbg) return 0ULL;
 

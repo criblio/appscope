@@ -35,8 +35,8 @@ typedef enum {
     FS_CONTENT_TEXT     // File content type text
 } fs_content_type_t;
 
-void initState();
-void resetState();
+void initState(void);
+void resetState(void);
 
 bool payloadToDiskForced(void);
 void setVerbosity(unsigned);
@@ -66,7 +66,7 @@ void doClose(int, const char *);
 void doOpen(int, const char *, fs_type_t, const char *);
 void doSendFile(int, int, uint64_t, int, const char *);
 void doCloseAndReportFailures(int, int, const char *);
-void doCloseAllStreams();
+void doCloseAllStreams(void);
 int remotePortIsDNS(int);
 int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);

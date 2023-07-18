@@ -116,7 +116,7 @@ static struct addrinfo *g_cached_addr = NULL;
 static void (*handleExit_fn)(void) = NULL;
 
 static transport_t*
-newTransport()
+newTransport(void)
 {
     transport_t *t;
 

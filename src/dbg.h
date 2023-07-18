@@ -12,11 +12,11 @@ typedef struct _dbg_t dbg_t;
 extern dbg_t* g_dbg;
 
 // Constructors Destructors
-void                 dbgInit();
-void                 dbgDestroy();
+void                 dbgInit(void);
+void                 dbgDestroy(void);
 
 // Accessors
-unsigned long long   dbgCountAllLines();
+unsigned long long   dbgCountAllLines(void);
 unsigned long long   dbgCountMatchingLines(const char*);
 void                 dbgDumpAll(FILE*);
 

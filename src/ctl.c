@@ -578,7 +578,7 @@ out:
 }
 
 ctl_t *
-ctlCreate()
+ctlCreate(void)
 {
     ctl_t *ctl = scope_calloc(1, sizeof(ctl_t));
     if (!ctl) {

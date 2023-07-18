@@ -8,7 +8,7 @@
 typedef struct _evt_fmt_t evt_fmt_t;
 
 // Constructors Destructors
-evt_fmt_t *         evtFormatCreate();
+evt_fmt_t *         evtFormatCreate(void);
 void                evtFormatDestroy(evt_fmt_t **);
 
 // Accessors

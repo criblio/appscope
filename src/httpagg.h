@@ -14,7 +14,7 @@
 
 typedef struct _http_agg_t http_agg_t;
 
-http_agg_t *httpAggCreate();
+http_agg_t *httpAggCreate(void);
 void httpAggDestroy(http_agg_t **);
 void httpAggAddMetric(http_agg_t *, event_t *, size_t, size_t);
 void httpAggSendReport(http_agg_t *, mtc_t *);

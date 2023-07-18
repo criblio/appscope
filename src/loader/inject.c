@@ -158,7 +158,7 @@ call_remfunc(void)
 #endif
 }
 
-static void call_remfunc_end() {}
+static void call_remfunc_end(void) {}
 
 static int
 inject(pid_t pid, remote_cmd_t cmd, uint64_t remAddr, char *path, int glibc)

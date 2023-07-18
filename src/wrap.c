@@ -549,7 +549,7 @@ cleanupReqMq:
 }
 
 static void
-remoteConfig()
+remoteConfig(void)
 {
     int timeout;
     struct pollfd fds;
@@ -916,7 +916,7 @@ threadInit(void)
 }
 
 static void
-doThread()
+doThread(void)
 {
     /*
      * If we try to start the periodic thread before the constructor
@@ -991,7 +991,7 @@ setProcId(proc_id_t *proc)
 }
 
 static void
-doReset()
+doReset(void)
 {
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
@@ -1475,7 +1475,7 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
  * Called when injected to perform GOT hooking.
  */ 
 static bool
-hookInject()
+hookInject(void)
 {
     char *full_path;
 

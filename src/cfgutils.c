@@ -1994,7 +1994,7 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
             }
 
             char exe[PATH_MAX];
-            size_t exeLen = scope_readlink(buf, exe, sizeof(exe));
+            ssize_t exeLen = scope_readlink(buf, exe, sizeof(exe));
             if (exeLen <= 0) {
                 DBG(NULL);
                 break;

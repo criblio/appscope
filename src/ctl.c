@@ -1216,16 +1216,6 @@ ctlTransport(ctl_t *ctl, which_transport_t who)
     return (who == CFG_LS) ? ctl->paytrans : ctl->transport;
 }
 
-cfg_transport_t
-ctlTransportType(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return (cfg_transport_t)-1;
-
-    return (who == CFG_LS) ?
-        transportType(ctl->paytrans) :
-        transportType(ctl->transport);
-}
-
 void
 ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
 {

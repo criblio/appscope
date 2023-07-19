@@ -315,7 +315,7 @@ jobs:
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make test" CI=${CI}
+        run: make build NOBUILD=1 CMD="make FSAN=true test" CI=${CI}
 
       # Get a list of the integration tests to be run. The output is JSON so it
       # can be used as a matrix deimension in a later stage. Give it an ID so

@@ -8,7 +8,6 @@ SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tag
 LIBRARY_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -Wstrict-prototypes -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\"
 LOADER_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -Wno-format-security -Wno-format-truncation -Wstrict-prototypes -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\" 
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\"
-TEST_FSAN_CFLAGS=-fsanitize=address
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
@@ -24,7 +23,6 @@ TEST_AR=$(MUSL_AR) ${COREDUMPER_AR} ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_A
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread -lz
-TEST_FSAN_LD_FLAGS=-Wl,--wrap=scopelibc_malloc -Wl,--wrap=scopelibc_free -Wl,--wrap=scopelibc_calloc -Wl,--wrap=scopelibc_realloc
 LIBRARY_INCLUDES=-I./src
 LOADER_INCLUDES=-I./src/loader
 CMOCKA_INCLUDES=-I./contrib/cmocka/include -I contrib/ls-hpack
@@ -42,6 +40,21 @@ ARCH=$(shell uname -m)
 LIBSCOPE=lib/$(OS)/$(ARCH)/libscope.so
 LIBLOADER=lib/$(OS)/$(ARCH)/libloader.a
 SCOPEDYN=bin/$(OS)/$(ARCH)/scopedyn
+
+# Currently we enable the address sanitizer by default on x86_64
+# TODO: enable it on aarch64 as well
+# in the gcc version > 9 we observe unexpected behavior regarding address sanitizer
+#
+ifeq ($(ARCH),x86_64)
+	FSAN=true
+else
+	FSAN?=false
+endif
+
+ifeq ($(FSAN),true)
+	TEST_FSAN_CFLAGS=-fsanitize=address
+	TEST_FSAN_LD_FLAGS=-Wl,--wrap=scopelibc_malloc -Wl,--wrap=scopelibc_free -Wl,--wrap=scopelibc_calloc -Wl,--wrap=scopelibc_realloc
+endif
 
 include os/linux/$(ARCH).mk
 
@@ -99,7 +112,11 @@ $(SCOPEDYN): src/loader/scopedyn.c src/loader/attach.c src/loader/loaderutils.c 
 
 ########## Tests ##########
 libtestfsan: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
+ifeq ($(FSAN),true)
 	@echo "$${CI:+::group::}Building Library Tests with memory sanitizer"
+else
+	@echo "$${CI:+::group::}Building Library Tests without memory sanitizer"
+endif
 	$(CC) -c $(TEST_CFLAGS) $(TEST_FSAN_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)
 	$(CC) $(TEST_CFLAGS) $(TEST_FSAN_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) $(TEST_FSAN_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) $(TEST_FSAN_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o evtutils.o strsearch.o httpagg.o httpmatch.o state.o httpstate.o metriccapture.o plattime.o scopeelf.o $(TEST_AR) $(TEST_LD_FLAGS) $(TEST_FSAN_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig

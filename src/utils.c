@@ -74,7 +74,7 @@ valToStr(enum_map_t map[], unsigned int val)
     return NULL;
 }
 
-int
+bool
 checkEnv(char *env, char *val)
 {
     char *estr;

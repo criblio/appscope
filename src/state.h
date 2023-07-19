@@ -39,6 +39,7 @@ void initState(void);
 void resetState(void);
 void destroyState(void);
 
+void setPayloadToDiskForced(bool);
 bool payloadToDiskForced(void);
 void setVerbosity(unsigned);
 void addSock(int, int, int);

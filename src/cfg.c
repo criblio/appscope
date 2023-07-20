@@ -65,6 +65,7 @@ struct _config_t
 
     struct {
         unsigned int enable;
+        bool dirEnable;      // TODO: This should be modified if we decide for full transport support payload channel
         char *dir;
     } pay;
 
@@ -230,6 +231,7 @@ cfgCreateDefault(void)
     c->log.level = DEFAULT_LOG_LEVEL;
 
     c->pay.enable = DEFAULT_PAYLOAD_ENABLE;
+    c->pay.dirEnable = DEFAULT_PAYLOAD_DIR_ENABLE;
     c->pay.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
 
     c->tags = DEFAULT_CUSTOM_TAGS;
@@ -622,6 +624,11 @@ cfgPayEnable(config_t *cfg)
     return (cfg) ? cfg->pay.enable : DEFAULT_PAYLOAD_ENABLE;
 }
 
+unsigned int
+cfgPayDirEnable(config_t *cfg) {
+    return (cfg) ? cfg->pay.dirEnable : DEFAULT_PAYLOAD_DIR_ENABLE;
+}
+
 const char *
 cfgPayDir(config_t *cfg)
 {
@@ -1007,6 +1014,13 @@ cfgPayEnableSet(config_t *cfg, unsigned int val)
 {
     if (!cfg || val > 1) return;
     cfg->pay.enable = val;
+}
+
+void
+cfgPayDirEnableSet(config_t *cfg, unsigned int val)
+{
+    if (!cfg || val > 1) return;
+    cfg->pay.dirEnable = val;
 }
 
 void

@@ -169,7 +169,7 @@ No events are emitted from files or sockets that exist before AppScope attaches 
 
 When you scope an app that produces HTTP traffic, you can capture the payloads using the `-p` or `--payloads` option. This is AppScope's  **payloads** feature (see the `payload` section in the AppScope [config file](/docs/config)), which is disabled by default, because it can create large amounts of data, and because it captures payloads unencrypted.
 
-When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_DEST` to `dir` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
 
 <span id="explore-captured"></span>
 

@@ -61,7 +61,8 @@ var rulesCmd = &cobra.Command{
 		if addProc == "" && remProc == "" {
 			if rc.CriblDest != "" || rc.MetricsDest != "" || rc.EventsDest != "" || rc.UserConfig != "" ||
 				cmd.Flags().Lookup("metricformat").Changed || rc.NoBreaker || rc.AuthToken != "" || rc.Payloads ||
-				rc.Backtrace || rc.Loglevel != "" || rc.Coredump || cmd.Flags().Lookup("verbosity").Changed {
+				cmd.Flags().Lookup("payloadsdest").Changed || rc.Backtrace || rc.Loglevel != "" || rc.Coredump ||
+				cmd.Flags().Lookup("verbosity").Changed {
 				helpErrAndExit(cmd, "The rules command without --add or --remove options, only supports the --json flag")
 			}
 		}
@@ -86,6 +87,8 @@ var rulesCmd = &cobra.Command{
 			helpErrAndExit(cmd, "Cannot specify --verbosity and --userconfig")
 		} else if rc.Payloads && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --payloads and --userconfig")
+		} else if cmd.Flags().Lookup("payloadsdest").Changed && rc.UserConfig != "" {
+			helpErrAndExit(cmd, "Cannot specify --payloadsdest and --userconfig")
 		} else if rc.Loglevel != "" && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
 		} else if rc.Backtrace && rc.UserConfig != "" {

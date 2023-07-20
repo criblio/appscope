@@ -159,6 +159,10 @@ event:
     name: .*
     field: .*
     value: .*
+payload:
+  enable: false
+  type: dir
+  dir: PAYLOADSPATH
 libscope:
   configevent: true
   summaryperiod: 10
@@ -181,6 +185,7 @@ libscope:
 	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)
 	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "EVENTSPATH", filepath.Join(wd, "events.json"), 1)
+	expectedYaml = strings.Replace(expectedYaml, "PAYLOADSPATH", filepath.Join(wd, "payloads"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CMDDIR", filepath.Join(wd, "cmd"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "LIBSCOPELOGPATH", filepath.Join(wd, "libscope.log"), 1)
 	return expectedYaml

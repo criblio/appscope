@@ -62,11 +62,11 @@ get_file_count_with_extension() {
 
 #
 # This test was written to test that the payload feature creates .in and
-# .out files to disk when we expect them.  Generally, if the payload
-# feature is off or payloads are routed to cribl, then we don't expect
-# payloads to be written to disk.  The only exception: if
-# payloads are routed to cribl and SCOPE_PAYLOAD_TO_DISK=true,
-# then we expect payloads to be written to disk.
+# .out files to disk when we expect them. 
+# The payload redirection:
+# - by default they are redirected to disk
+# - "SCOPE_PAYLOAD_DEST" or "--payloaddests" allows to redirect the
+#   payloads to same destination as defined in event transport.
 #
 # At this time, we're not testing the *contents* of the payload files,
 # or the names of the files, just the existance of them.
@@ -87,10 +87,10 @@ endtest
 
 starttest payload_off_2
 echo "When the payload feature is off, verify that no payload files are"
-echo "  written to disk, even if SCOPE_PAYLOAD_TO_DISK=true"
+echo "  written to disk, even if SCOPE_PAYLOAD_DEST=dir"
 SCOPE_PAYLOAD_ENABLE=false \
 SCOPE_CRIBL_ENABLE=true \
-SCOPE_PAYLOAD_TO_DISK=true \
+SCOPE_PAYLOAD_DEST="dir" \
 scope run -- curl -Lso /dev/null https://cribl.io
 FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT > 0 )); then
@@ -100,11 +100,12 @@ cleanup
 endtest
 
 starttest payload_on_to_cribl
-echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=true, verify no"
+echo "When the payload feature is on, SCOPE_PAYLOAD_DEST=event and SCOPE_CRIBL_ENABLE=true, verify no"
 echo "  payloads are written to disk (they are sent over the cribl"
 echo "  connection)"
 SCOPE_PAYLOAD_ENABLE=true \
 SCOPE_CRIBL_ENABLE=true \
+SCOPE_PAYLOAD_DEST="event" \
 scope run -- curl -Lso /dev/null https://cribl.io
 FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT > 0 )); then
@@ -115,15 +116,16 @@ endtest
 
 starttest payload_on_to_cribl_but_overridden_to_disk
 echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=true, verify"
-echo "  payloads are written to disk if SCOPE_PAYLOAD_TO_DISK=true"
+echo "  payloads are written to disk if SCOPE_PAYLOAD_DEST=dir"
 SCOPE_PAYLOAD_ENABLE=true \
 SCOPE_CRIBL_ENABLE=true \
-SCOPE_PAYLOAD_TO_DISK=true \
+SCOPE_PAYLOAD_DEST="dir" \
 scope run -- curl -Lso /dev/null https://cribl.io
 FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT == 0 )); then
     fail "FAILED - expected payload files, but found $FILE_COUNT"
 fi
+cleanup
 endtest
 
 starttest payload_on_but_not_to_cribl_1
@@ -137,15 +139,16 @@ FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT == 0 )); then
     fail "FAILED - expected payload files, but found $FILE_COUNT"
 fi
+cleanup
 endtest
 
 starttest payload_on_but_not_to_cribl_2
 echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=false, verify"
-echo "  payloads are written to disk even if SCOPE_PAYLOAD_TO_DISK=false."
+echo "  payloads are written to disk even if SCOPE_PAYLOAD_DEST=dir."
 echo "  Payloads always go to disk if SCOPE_CRIBL_ENABLE=false"
 SCOPE_PAYLOAD_ENABLE=true \
 SCOPE_CRIBL_ENABLE=false \
-SCOPE_PAYLOAD_TO_DISK=false \
+SCOPE_PAYLOAD_DEST="dir" \
 scope run -- curl -Lso /dev/null https://cribl.io
 FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT == 0 )); then
@@ -159,6 +162,7 @@ endtest
 starttest payload_host_app
 SCOPE_PAYLOAD_ENABLE=true \
 SCOPE_CRIBL_ENABLE=false \
+SCOPE_PAYLOAD_DEST="dir" \
 scope run -- host -t a cribl.io
 in_count=$(get_file_count_with_extension $SCOPE_PAYLOAD_DIR "in")
 out_count=$(get_file_count_with_extension $SCOPE_PAYLOAD_DIR "out")

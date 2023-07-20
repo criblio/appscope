@@ -56,6 +56,7 @@ event:
     path: '/opt/test-runner/logs/events_from_cfg.log'
 payload:
   enable: false
+  type: "dir"
   dir: '/tmp'
 libscope:
   configevent: true

@@ -1256,7 +1256,7 @@ periodic(void *arg)
             summaryTime = tv.tv_sec + g_thread.interval;
 
             if (tv.tv_sec >= logReportTime) {
-                transport_status_t ctlStatus = ctlConnectionStatus(g_ctl, CFG_CTL);
+                transport_status_t ctlStatus = ctlConnectionStatus(g_ctl);
                 logOurConnectionStatus(ctlStatus, "event");
                 transport_status_t mtcStatus = mtcConnectionStatus(g_mtc);
                 logOurConnectionStatus(mtcStatus, "metric");

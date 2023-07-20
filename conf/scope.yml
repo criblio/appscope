@@ -604,6 +604,19 @@ payload:
   #
   enable: false
 
+  # Determine the payload type destination
+  #   Type:     string
+  #   Values:   "dir", "event"
+  #   Default:  "dir"
+  #   Override: $SCOPE_PAYLOAD_DEST
+  #
+  #
+  # This allows to specify the payload destination
+  # - "event" allows to send the payloads to same location as events
+  # - "dir" allows to use directory to store payload files
+  #
+  type: "dir"
+
   # Directory for payload files
   #   Type:     string
   #   Values:   (directory path)
@@ -611,6 +624,8 @@ payload:
   #   Override: $SCOPE_PAYLOAD_DIR
   #
   # Consider using a performant filesystem to reduce I/O performance impacts.
+  #
+  # Applies when dest is "dir".
   #
   dir: '/tmp'
 

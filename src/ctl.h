@@ -36,8 +36,9 @@ typedef enum {
 
 typedef enum {
     PAYLOAD_STATUS_DISABLE = 0,    // payloads are disabled
-    PAYLOAD_STATUS_CRIBL = 1,      // payloads are enabled and will go to cribl
-    PAYLOAD_STATUS_DISK = 2,       // payloads are enabled and will go on disk
+    PAYLOAD_STATUS_CRIBL = 1,      // payloads are enabled and will use cribl transport
+    PAYLOAD_STATUS_CTL = 2,        // payloads are enabled and will use event transport
+    PAYLOAD_STATUS_DISK = 3,       // payloads are enabled and will go on disk
 } payload_status_t;
 
 /**
@@ -133,7 +134,8 @@ void                ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
 transport_t *       ctlTransport(ctl_t *, which_transport_t);
 evt_fmt_t *         ctlEvtGet(ctl_t *);
 void                ctlEvtSet(ctl_t *, evt_fmt_t *);
-transport_status_t  ctlConnectionStatus(ctl_t *, which_transport_t);
+transport_status_t  ctlConnectionStatus(ctl_t *);
+transport_status_t  ctlPayloadConnectionStatus(ctl_t *);
 
 // Accessor for performance
 bool            ctlEvtSourceEnabled(ctl_t *, watch_t);

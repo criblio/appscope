@@ -816,6 +816,37 @@ cfgProcessEnvironmentPayEnable(void **state)
 }
 
 static void
+cfgProcessEnvironmentPayType(void **state)
+{
+    config_t *cfg = cfgCreateDefault();
+    cfgPayDirEnableSet(cfg, FALSE);
+    assert_int_equal(cfgPayDirEnable(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DEST", "dir", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayDirEnable(cfg), TRUE);
+
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DEST", "event", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayDirEnable(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_PAYLOAD_DEST"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayDirEnable(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DEST", "blah", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
 cfgProcessEnvironmentPayDir(void **state)
 {
     config_t *cfg = cfgCreateDefault();
@@ -3047,6 +3078,7 @@ main(int argc, char *argv[])
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_log),
         cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
         cmocka_unit_test(cfgProcessEnvironmentPayEnable),
+        cmocka_unit_test(cfgProcessEnvironmentPayType),
         cmocka_unit_test(cfgProcessEnvironmentPayDir),
         cmocka_unit_test(cfgProcessEnvironmentCmdDebugIsIgnored),
         cmocka_unit_test(cfgProcessCommandsCmdDebugIsProcessed),

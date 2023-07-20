@@ -69,6 +69,8 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			helpErrAndExit(cmd, "Cannot specify --verbosity and --userconfig")
 		} else if rc.Payloads && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --payloads and --userconfig")
+		} else if cmd.Flags().Lookup("payloadsdest").Changed && rc.UserConfig != "" {
+			helpErrAndExit(cmd, "Cannot specify --payloadsdest and --userconfig")
 		} else if rc.Loglevel != "" && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
 		} else if rc.Backtrace && rc.UserConfig != "" {

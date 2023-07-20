@@ -77,18 +77,6 @@ list_t *g_extra_net_info_list = NULL;
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 
-static bool g_force_payloads_to_disk = FALSE;
-
-void
-setPayloadToDiskForced(bool val) {
-    g_force_payloads_to_disk = val;
-}
-
-bool
-payloadToDiskForced(void) {
-    return g_force_payloads_to_disk;
-}
-
 static void
 destroyNetInfo(void *data)
 {
@@ -312,9 +300,6 @@ initState(void)
 
     initHttpState();
     initMetricCapture();
-
-    // Some environment variables we don't want to continuously check
-    setPayloadToDiskForced(checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true"));
 
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime

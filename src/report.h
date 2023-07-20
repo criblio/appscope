@@ -89,6 +89,7 @@ extern mtc_t *g_mtc;
 extern ctl_t *g_ctl;
 
 void initReporting(void);
+void destroyReporting(void);
 void setReportingInterval(int);
 void doErrorMetric(metric_t, control_type_t, const char *, const char *, void *);
 void doProcMetric(metric_t);

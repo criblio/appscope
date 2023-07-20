@@ -13,6 +13,7 @@
 #include "fn.h"
 #include "ctl.h"
 #include "cfgutils.h"
+#include "evtutils.h"
 #include "evtformat.h"
 #include "httpstate.h"
 #include "test.h"
@@ -36,6 +37,13 @@ needleTestSetup(void** state)
 
     // Call the general groupSetup() too.
     return groupSetup(state);
+}
+
+static int
+needleTestTeardown(void** state)
+{
+    destroyState();
+    return groupTeardown(state);
 }
 
 #ifdef __linux__
@@ -68,7 +76,7 @@ int cmdPostEvent(ctl_t *ctl, char *event)
 {
     //printf("%s: data at: %p\n", __FUNCTION__, event);
     doProtocolMetric((protocol_info *)event);
-    scope_free(event);
+    evtFree((evt_type *)event);
     return 0;
 }
 
@@ -340,6 +348,6 @@ main(int argc, char *argv[])
         cmocka_unit_test(userDefinedHeaderExtract),
         cmocka_unit_test(xAppScopeHeaderExtract),
     };
-    return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);
+    return cmocka_run_group_tests(tests, needleTestSetup, needleTestTeardown);
 }
 

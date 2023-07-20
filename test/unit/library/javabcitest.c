@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "test.h"
+#include "scopestdlib.h"
 #include "javabci.h"
 
 /*
@@ -203,7 +204,7 @@ javaBciConvertMethodToNative(void** state)
     assert_non_null(classInfo);
 
     int methodIndex = javaFindMethodIndex(classInfo, "print", "(Ljava/lang/String;)V");
-    javaConvertMethodToNative(classInfo, methodIndex);
+    void *addrConv = javaConvertMethodToNative(classInfo, methodIndex);
     
     unsigned char *dest = malloc(classInfo->length);
     javaWriteClass(dest, classInfo);
@@ -217,6 +218,7 @@ javaBciConvertMethodToNative(void** state)
 
     javaDestroy(&modClassInfo);
     free(dest);
+    scope_free(addrConv);
 }
 
 static void

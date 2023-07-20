@@ -8,11 +8,6 @@
 #include "scopestdlib.h"
 #include "test.h"
 
-
-//   make FSAN=1 libtest
-//   LD_LIBRARY_PATH=contrib/build/cmocka/src/ test/linux/httpmatchtest
-
-
 #define NET_ENTRIES 1024
 net_info *g_netinfo = NULL;
 list_t *g_extra_net_info_list = NULL;
@@ -108,6 +103,7 @@ httpReqSaveAddOfDuplicateFails(void **state)
 
     // reqToAdd1 is still there, but should be cleaned up here
     httpMatchDestroy(&match);
+    freeReq(reqToAdd2);
 }
 
 static void

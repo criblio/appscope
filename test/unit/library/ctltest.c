@@ -755,6 +755,7 @@ ctlSendLogConsoleAsciiData(void **state)
     assert_string_equal(ascii_text, val);
     ctlDestroy(&ctl);
     allow_copy_buf_data(FALSE);
+    destroyState();
 }
 
 static void
@@ -809,6 +810,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
 
     scope_free(non_basic_ascii_text);
     allow_copy_buf_data(FALSE);
+    destroyState();
 }
 
 int

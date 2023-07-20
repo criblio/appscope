@@ -104,6 +104,7 @@ mtcTransportSetAndMtcSend(void** state)
         fail_msg("Couldn't delete file %s", file_path);
 
     mtcDestroy(&mtc);
+    free(msg);
 }
 
 static void

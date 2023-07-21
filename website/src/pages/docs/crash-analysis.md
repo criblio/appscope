@@ -106,6 +106,6 @@ The snapshot file contains properties of the process:
 
 ![AppScope crash snapshot](./images/AppScope-Snapshot-screenshot.png)
 
-The core dump (not shown here) contains a binary snapshot of the application at the time of the crash, for inspection with a debugger like gdb.
+The core dump (not shown here) contains a binary snapshot of the application at the time of the crash, for inspection with a debugger like gdb. By default, the daemon does not send this over the network since it's not usually useful outside of its origin environment. The [man page](https://man7.org/linux/man-pages/man5/core.5.html) on core dumps can help you explore this data.
 
 If you found this post useful, or need some help getting through it, please consider joining our [community](https://appscope.dev/docs/community/).

@@ -27,7 +27,7 @@ For example’s sake we will:
 
 Set up your Cribl Cloud instance:
 
-_Tip: Sign up for a free account at [https://cribl.cloud](https://cribl.cloud)_
+_Tip: Sign up for a free account at [https://cribl.cloud](https://cribl.cloud)._
 
 1. Click 'Manage Stream'
 2. Click 'default' under 'Worker Groups'
@@ -89,9 +89,9 @@ sudo ~/Downloads/scope attach --backtrace --coredump nginx
 
 Force a crash of nginx by sending the process a BUS error signal:
 
-_Tip: AppScope will respond to SIGBUS, SIGINT, SIGSEGV, SIGFPE signals._
+_Tip: AppScope will respond to SIGBUS, SIGINT, SIGSEGV, SIGFPE signals (the usual signals of a crashing process)._
 ```
-sudo kill -s SIGBUS \<pid_of_nginx\>
+sudo kill -s SIGBUS <pid_of_nginx>
 ```
 
 In your S3 bucket you should be able to see 4 files (info, backtrace, snapshot, cfg) that give meaningful insight into the crash.
@@ -107,5 +107,5 @@ The snapshot file contains properties of the process:
 ![AppScope crash snapshot](./images/AppScope-Snapshot-screenshot.png)
 
 The core dump (not shown here) contains a binary snapshot of the application at the time of the crash, for inspection with a debugger like gdb.
- 
+
 If you found this post useful, or need some help getting through it, please consider joining our [community](https://appscope.dev/docs/community/).

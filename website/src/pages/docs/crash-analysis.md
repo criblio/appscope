@@ -26,9 +26,19 @@ For example’s sake we will:
 ### Preparation
 
 Set up your Cribl Cloud instance:
-```
-TBD
-```
+
+_Tip: Sign up for a free account at [https://cribl.cloud](https://cribl.cloud)_
+
+1. Click 'Manage Stream'
+2. Click 'default' under 'Worker Groups'
+3. Click 'Data -> Destinations' and choose the Amazon S3 source
+4. Click 'Add Destination' and configure the destination with your S3 credentials and preferences. Click 'Save'
+5. Click 'Data -> Sources' and choose the TCP source
+6. Click 'in_tcp' and configure the source to be Enabled, with address 0.0.0.0 and port 10060.
+7. Click 'Connected Destinations' and choose 'QuickConnect'. Select your S3 Destination. Click 'Save'
+8. In the top right corner of the screen, click 'Commit and Deploy'
+
+At this point, you have configured a Cribl Cloud worker to listen to TCP data and send it on to S3. Great!
 
 Download the AppScope binary:
 ```
@@ -38,8 +48,9 @@ curl -Ls https://cdn.cribl.io/dl/scope/1.4.1/linux/$(uname -m)/scope.md5 | md5su
 chmod +x scope
 ```
 
-Download and build the `scope-ebpf` project:
-_Tip: eBPF code falls under a different license to the AppScope project, hence the separate repository_
+Download and build the `scope-ebpf` binary:
+
+_Tip: eBPF code falls under a different license to the AppScope project, hence the separate repository._
 ```
 git clone git@github.com:criblio/scope-ebpf.git
 cd scope-ebpf
@@ -48,38 +59,53 @@ make all
 
 Deploy the eBPF module to listen for crashing applications:
 ```
-sudo ~/Downloads/scope-ebpf/bin/scope-ebpf &
+sudo ~/Downloads/scope-ebpf/bin/scope-ebpf
 ```
+Leave this shell running and open another terminal / tab.
 
-Deploy the AppScope daemon, to receive messages from eBPF and send crash files to a network destination
+Deploy the AppScope daemon, to receive messages from eBPF and send crash files to a network destination:
 ```
-sudo ~/Downloads/scope daemon --filedest tcp://<path-to-cribl-cloud-tcp>:<port>
+sudo ~/Downloads/scope daemon --filedest tcp://<path-to-cribl-cloud-tcp>:10060
 ```
+Once you start the daemon, the scope-ebpf binary will exit in the other terminal. That's normal.
 
 Our preparation is complete! The eBPF kernel module should be loaded, listening for application crash signals. The AppScope Daemon should be running, waiting for the eBPF module to tell it that an application has crashed. Once it receives that notification, it will look for crash files and send them on to the configured network destination.
 
 
 ### Crash Investigation
 
-Start an nginx container:
+Start a daemonized nginx container:
 ```
-docker run --rm nginx
+docker run --rm -d nginx
 ```
 
 Attach AppScope to the containerized nginx process, and enable backtrace and core dump on crash:
-_Tip: AppScope can be loaded into an application when it starts, or after it has started, with attach._
+
+_Tip: Alternatively, AppScope can be loaded into an application when it starts._
 ```
 sudo ~/Downloads/scope attach --backtrace --coredump nginx
-# choose the master process from the list
+# choose the master process from the list, noting the pid of the process
 ```
 
 Force a crash of nginx by sending the process a BUS error signal:
-_Tip: AppScope will respond to SIGBUS, SIGINT, SIGSEGV, SIGFPE signals_
+
+_Tip: AppScope will respond to SIGBUS, SIGINT, SIGSEGV, SIGFPE signals._
 ```
-sigkill -s SIGBUS nginx 
+sudo kill -s SIGBUS \<pid_of_nginx\>
 ```
 
-In your S3 bucket you should be able to see 3 files (info, backtrace, snapshot) that give meaningful insight into the crash.
+In your S3 bucket you should be able to see 4 files (info, backtrace, snapshot, cfg) that give meaningful insight into the crash.
 
-You can also inspect the crash files, including the core dump, in /tmp/appscope/<pid of nginx>/
+You can also inspect the crash files, including the core dump, in `/tmp/appscope/<pid_of_nginx>/`.
 
+The backtrace file contains the application stack trace at the time of the crash:
+
+![AppScope crash backtrace](./images/AppScope-Backtrace-screenshot.png)
+
+The snapshot file contains properties of the process:
+
+![AppScope crash snapshot](./images/AppScope-Snapshot-screenshot.png)
+
+The core dump (not shown here) contains a binary snapshot of the application at the time of the crash, for inspection with a debugger like gdb.
+ 
+If you found this post useful, or need some help getting through it, please consider joining our [community](https://appscope.dev/docs/community/).

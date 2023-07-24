@@ -125,6 +125,8 @@ build/libunwind/src/.libs/libunwind.a:
 	@echo "$${CI:+::group::}Building coredumper"
 	@$(RM) -r build/coredumper
 	@mkdir build/coredumper
+# Enables debug
+	#cd build/coredumper && autoreconf -fvi ../../coredumper && ../../coredumper/configure --enable-debug CFLAGS="-fPIC -g" --disable-shared && $(MAKE)
 	cd build/coredumper && autoreconf -fvi ../../coredumper && ../../coredumper/configure CFLAGS=-fPIC --disable-shared && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/coredumper/.libs/libcoredumper.a
 	if [ "aarch64" = "$(ARCH)" ]; then \

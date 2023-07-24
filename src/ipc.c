@@ -435,6 +435,7 @@ static responseProcessor supportedResp[] = {
     [IPC_CMD_SET_SCOPE_CFG]        = ipcRespSetScopeCfg,
     [IPC_CMD_GET_TRANSPORT_STATUS] = ipcRespGetTransportStatus,
     [IPC_CMD_GET_PROC_DETAILS]     = ipcRespGetProcessDetails,
+    [IPC_CMD_INITIATE_SNAPSHOT]    = ipcRespInitiateSnapshot,
     [IPC_CMD_UNKNOWN]              = ipcRespStatusNotImplemented
 };
 

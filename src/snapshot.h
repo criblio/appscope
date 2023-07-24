@@ -18,6 +18,7 @@ void snapshotSignalHandler(int, siginfo_t *, void *);
 void snapshotSetCoredump(bool);
 void snapshotSetBacktrace(bool);
 bool snapshotIsEnabled(void);
+bool snapshotViaCommand(void);
 
 /*
  * API to handle application signal handler

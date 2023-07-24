@@ -3588,7 +3588,7 @@ doPayload()
             scope_gettimeofday(&tv, NULL);
             double timestamp = tv.tv_sec + tv.tv_usec/1e6;
             int rc = scope_snprintf(pay, hlen,
-                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
+                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":\"%ld\",\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
                               g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
                 // unlikely

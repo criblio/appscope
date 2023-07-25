@@ -17,7 +17,7 @@
 
 - name: Solving Problems with AppScope
   child: 
-    - name: Application Crash Analysis with AppScope
+    - name: Analyzing Application Crashes
       path: /docs/crash-analysis
 
 - name: Using AppScope With Cribl Edge

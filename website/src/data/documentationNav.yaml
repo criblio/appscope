@@ -20,12 +20,17 @@
     - name: Analyzing Application Crashes
       path: /docs/crash-analysis
 
+    - name: Analyzing Application Crashes
+      path: /docs/crash-analysis
+
 - name: Using AppScope With Cribl Edge
   child: 
     - name: Cribl Edge on a Host
       path: /docs/edgescope-host
+
     - name: Cribl Edge in Docker 
       path: /docs/edgescope-docker
+
     - name: Cribl Edge in Kubernetes
       path: /docs/edgescope-k8s
 

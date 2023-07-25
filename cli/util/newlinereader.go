@@ -12,6 +12,8 @@ import (
 func NewlineReader(r io.Reader, match func(string) bool, callback func(line int, offset int64, b []byte) error) (int, error) {
 	cr := &CountingReader{Reader: r}
 	scanner := bufio.NewScanner(cr)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
 	idx := 0
 	offset := int64(0)
 	for scanner.Scan() {

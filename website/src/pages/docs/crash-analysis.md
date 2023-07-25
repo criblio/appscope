@@ -95,7 +95,7 @@ sudo ~/Downloads/scope attach --backtrace --coredump nginx
 
 This command shows the Nginx process with its child processes, in a list. Note the PID of the parent Nginx process.
 
-(Alternatively, you could have used the `scope rules` [command](cli-reference#rules) to tell AppScope to load itself into an application when it starts.)
+(Alternatively, you could have used the `scope run` [command](cli-reference#run) or the `scope rules` [command](cli-reference#rules) to tell AppScope to load itself into an application when it starts.)
 
 Force a crash of Nginx by sending the process a `BUS` error signal:
 

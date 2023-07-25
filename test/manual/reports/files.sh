@@ -3,6 +3,7 @@
 SCOPE_PATH="."
 RESULT="./file_results.txt"
 cmd=""
+id=""
 dir=0
 
 while test $# -gt 0
@@ -18,6 +19,9 @@ do
                ;;
         --raw) raw=$2
                echo "using the events file at $2."
+               ;;
+        --id) id="--id $2"
+               echo "using the events file defined by id $2."
                ;;
         --*) echo "bad option $1"
                ;;
@@ -36,8 +40,7 @@ if [[ $raw != "" ]]; then
         grep fs.open $raw | jq '.body.data | "\(.file)"' | sort | uniq > $RESULT
     fi
 elif [ $dir -ne 0  ]; then
-    $SCOPE_PATH/scope events -aj | grep '"open"' | jq -r '.data.file' | xargs dirname | sort | uniq  > $RESULT    
+    $SCOPE_PATH/scope events -aj $id | grep '"fs.open"' | jq -r '.data.file' | xargs dirname | sort | uniq  > $RESULT
 else
-    $SCOPE_PATH/scope events -aj | grep '"open"' | jq -r '.data.file' | sort | uniq > $RESULT
+    $SCOPE_PATH/scope events -aj $id | grep '"fs.open"' | jq -r '.data.file' | sort | uniq > $RESULT
 fi
-

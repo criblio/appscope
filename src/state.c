@@ -2011,7 +2011,15 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         if ((g_netinfo[sockfd].dnsRecv == FALSE) &&
             remotePortIsDNS(sockfd) &&
             (g_netinfo[sockfd].dnsName[0])) {
-            g_netinfo[sockfd].dnsRecv = TRUE;
+
+            /*
+            * We encounter scenarios where we do not close the socket
+            * for DNS communication when exchanging
+            * a single DNS query/response.
+            * Instead, we keep the socket open for DNS transmission with
+            * multiple request/responses (e.g. DNS tunneling).
+            */
+            // g_netinfo[sockfd].dnsRecv = TRUE;
             doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
         }
 

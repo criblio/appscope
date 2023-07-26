@@ -89,6 +89,11 @@ Unexpectedly long domain names
 Unexpected characters in domain names (non-ASCII and capital letters)
 Unexpectedly high Shannon Entropy value of specific domains
 
+#### Demo
+Here is the example detection of DNS tunneling which is used by [iodine](https://code.kryo.se/iodine/) project
+
+![Dns-demo](./images/dns-demo.gif)
+
 #### Example notification
 
 Here is the overview of example alert notification which can be seen in the Slack:

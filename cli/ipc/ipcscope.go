@@ -26,6 +26,7 @@ const (
 	reqCmdSetScopeCfg
 	reqCmdGetTransportStatus
 	reqCmdGetProcessDetails
+	reqCmdInitiateSnapshot
 )
 
 // Request which contains only cmd without data
@@ -261,6 +262,30 @@ func (cmd *CmdGetProcessDetails) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, err
 }
 
 func (cmd *CmdGetProcessDetails) UnmarshalResp(respData []byte) error {
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
+}
+
+// CmdInitiateSnapshot ask for the library to take a snapshot
+type CmdInitiateSnapshot struct {
+	Response scopeOnlyStatusResponse
+}
+
+func (cmd *CmdInitiateSnapshot) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdInitiateSnapshot})
+
+	return ipcDispatcher(req, pidCtx)
+}
+
+func (cmd *CmdInitiateSnapshot) UnmarshalResp(respData []byte) error {
 	err := yaml.Unmarshal(respData, &cmd.Response)
 	if err != nil {
 		return err

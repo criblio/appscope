@@ -20,7 +20,7 @@
     - name: Analyzing Application Crashes
       path: /docs/crash-analysis
 
-    - name: Detect DNS Data exfiltration
+    - name: Detecting DNS Data Exfiltration
       path: /docs/dns-data-exfiltration
 
 - name: Using AppScope With Cribl Edge

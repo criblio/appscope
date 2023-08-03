@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,7 +77,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	}
 
 	// Is the pid provided in this container/this host?
-	pidInThisNs, err := ipc.IpcNsIsSame(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
+	pidInOtherNs, _, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
 	if err != nil {
 		log.Error().Err(err).Msgf("error determining namespace")
 		return err
@@ -89,7 +90,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	//		hostname file in place - do nothing here, just check it exists
 	//		generate snapshot - call gensnapshot
 	//			get process username,environ - from /proc
-	if pidInThisNs {
+	if !pidInOtherNs {
 		// Host Name and snapshot
 		hostnameFile := "/etc/hostname"
 
@@ -288,4 +289,29 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	}
 
 	return nil
+}
+
+var errInitiateSnapshot = errors.New("error initiate snapshot")
+
+func InitiateSnapshot(pidCtx ipc.IpcPidCtx) (string, error) {
+
+	// Issue the request to take a snapshot
+	cmdInitiateSnapshot := ipc.CmdInitiateSnapshot{}
+	resp, err := cmdInitiateSnapshot.Request(pidCtx)
+	if err != nil {
+		return "", err
+	}
+
+	// Handle the response
+	err = cmdInitiateSnapshot.UnmarshalResp(resp.ResponseScopeMsgData)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.MetaMsgStatus != ipc.ResponseOK || *cmdInitiateSnapshot.Response.Status != ipc.ResponseOK {
+		return "", errInitiateSnapshot
+	}
+
+	return "initiate snapshot successful", nil
+
 }

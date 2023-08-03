@@ -439,16 +439,10 @@ bool
 snapshotIsEnabled(void) {
     return snapshotOpt ? TRUE : FALSE;
 }
-/*
- * Signal handler responsible for snapshot
- */
-void
-snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
-    char snapPidDirPath[PATH_MAX] = {0};
-    int currentOffset = SNAPSHOT_DIR_LEN;
 
-    // Define that we are in a signal handler
-    g_issighandler = TRUE;
+static bool
+pidDirPath(char *snapPidDirPath, int pathlen) {
+    int currentOffset = SNAPSHOT_DIR_LEN;
 
     // Start with create a prefix path
     scope_memcpy(snapPidDirPath, SNAPSHOT_DIR_PREFIX, SNAPSHOT_DIR_LEN);
@@ -459,20 +453,41 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     // Append PID to path
     sigSafeUtoa(scope_getpid(), pidBuf, 10, &msgLen);
     currentOffset += msgLen + 1;
-    if (currentOffset > PATH_MAX) {
+    if (currentOffset > pathlen) {
         DBG(NULL);
-        g_issighandler = FALSE;
-        return;
+        return FALSE;
     }
     scope_memcpy(snapPidDirPath + SNAPSHOT_DIR_LEN, pidBuf, msgLen);
     scope_memcpy(snapPidDirPath + SNAPSHOT_DIR_LEN + msgLen, "/", 1);
-    // Create the base PID directory
-    sigSafeMkdirRecursive(snapPidDirPath);
 
-    // Snapshot Timestamp
+    // Create the base PID directory
+    if (!sigSafeMkdirRecursive(snapPidDirPath)) {
+        DBG(NULL);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+/*
+ * Signal handler responsible for snapshot
+ */
+void
+snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
+
+    // Define that we are in a signal handler
+    g_issighandler = TRUE;
+
+    char snapPidDirPath[PATH_MAX] = {0};
+    if (!pidDirPath(snapPidDirPath, sizeof(snapPidDirPath))) {
+        g_issighandler = FALSE;
+        return;
+    }
+
+    // Snapshot Timestamp.  Convert epoch to string.
     char timeBuf[1024] = {0};
-    msgLen = 0;
-    // Convert epoch to string
+    int msgLen = 0;
     sigSafeUtoa(scope_time(NULL), timeBuf, 10, &msgLen);
 
     // Perform all snapshot actions which are enabled
@@ -502,3 +517,33 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
 
     g_issighandler = FALSE;
 }
+
+/*
+ * Generate a snapshot now.  No signal required.
+ */
+bool
+snapshotViaCommand(void) {
+    char snapPidDirPath[PATH_MAX] = {0};
+    if (!pidDirPath(snapPidDirPath, sizeof(snapPidDirPath))) {
+        return FALSE;
+    }
+
+    // Snapshot Timestamp.  Convert epoch to string.
+    char timeBuf[1024] = {0};
+    int msgLen = 0;
+    sigSafeUtoa(scope_time(NULL), timeBuf, 10, &msgLen);
+
+
+    // Perform all snapshot actions except for snapBacktrace.
+    // AppScope's libscope.so thread is probably not of interest.
+    bool success = TRUE;
+    for (int index = 0; index < ARRAY_SIZE(allSnapshotActions); ++index) {
+        struct snapshotAction act = allSnapshotActions[index];
+        if (act.execute != snapBacktrace) {
+            success = success && act.execute(snapPidDirPath, timeBuf, NULL);
+        }
+    }
+
+    return success;
+}
+

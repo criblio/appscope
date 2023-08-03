@@ -4,6 +4,7 @@
 #include "dbg.h"
 #include "ipc_resp.h"
 #include "scopestdlib.h"
+#include "snapshot.h"
 #include "runtimecfg.h"
 
 static const char* cmdMetaName[] = {
@@ -18,6 +19,7 @@ static const char* cmdScopeName[] = {
     [IPC_CMD_SET_SCOPE_CFG]        = "setScopeCfg",
     [IPC_CMD_GET_TRANSPORT_STATUS] = "getTransportStatus",
     [IPC_CMD_GET_PROC_DETAILS]     = "getProcessDetails",
+    [IPC_CMD_INITIATE_SNAPSHOT]    = "initiateSnapshot",
 };
 
 #define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
@@ -517,6 +519,20 @@ allocFail:
     ipcRespWrapperDestroy(wrap);
     return NULL; 
 }
+
+
+/*
+ * Creates the wrapper for response to IPC_CMD_INITIATE_SNAPSHOT
+ */
+scopeRespWrapper *
+ipcRespInitiateSnapshot(const cJSON *unused) {
+    if (snapshotViaCommand()) {
+        return ipcRespStatus(IPC_RESP_OK);
+    }
+    return ipcRespStatus(IPC_RESP_SERVER_ERROR);
+}
+
+
 /*
  * Creates the wrapper for failed case in processing scope msg
  */

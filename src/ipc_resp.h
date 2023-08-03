@@ -28,6 +28,7 @@ typedef enum {
     IPC_CMD_SET_SCOPE_CFG,        // Update the current configuration, introduced in: 1.3.0
     IPC_CMD_GET_TRANSPORT_STATUS, // Retrieves the transport status, introduced in: 1.3.0
     IPC_CMD_GET_PROC_DETAILS,     // Retrieves the process details, introduced in: 1.4.0
+    IPC_CMD_INITIATE_SNAPSHOT,    // Requests a snapshot, introduced in: 1.4.2
     // Place to add new message
     IPC_CMD_UNKNOWN,              // MUST BE LAST - points to unsupported message
 } ipc_scope_req_t;
@@ -76,6 +77,7 @@ scopeRespWrapper *ipcRespGetScopeCfg(const cJSON *);
 scopeRespWrapper *ipcRespSetScopeCfg(const cJSON *);
 scopeRespWrapper *ipcRespGetTransportStatus(const cJSON *);
 scopeRespWrapper *ipcRespGetProcessDetails(const cJSON *);
+scopeRespWrapper *ipcRespInitiateSnapshot(const cJSON *);
 scopeRespWrapper *ipcRespStatusNotImplemented(const cJSON *);
 scopeRespWrapper *ipcRespStatusScopeError(ipc_resp_status_t);
 

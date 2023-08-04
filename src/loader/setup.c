@@ -746,7 +746,7 @@ getMountPath(pid_t pid)
         if ((strstr(buf, "overlay")) &&
             (strstr(buf, "docker"))) {
             
-            // no longer a candidate as we've already mounted this proc
+            // ignore this entry in the file as this is a mount that we created earlier
             if (strstr(buf, "appscope")) {
                 continue;
             }
@@ -778,12 +778,23 @@ getMountPath(pid_t pid)
     return NULL;
 }
 
-// Mount the scope rules and unix socket into mountDest/usr/lib/appscope/*
+// Mount a file from host @mountDest to container @mountDest in the container specified by @pid
 bool
 setupMount(pid_t pid, const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
+    DIR *dir = NULL;
     char *overlay = NULL;
 
+    // Check if mountDest exists on host before trying to mount into a container
+    dir = opendir(mountDest);
+    if (dir != NULL) {
+        closedir(dir);
+    } else {
+        // Directory does not exist
+        return TRUE; // Skip the mount job but return success anyway
+    }
+
+    // Find the target mountpoint and perform the mount
     if ((overlay = getMountPath(pid)) != NULL) {
         mountCDirs(pid, overlay, mountDest, NULL, nsUid, nsGid);
         free(overlay);

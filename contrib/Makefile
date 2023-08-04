@@ -3,7 +3,7 @@
 #
 # The `contrib/` folder contains a number of external dependencies we keep
 # locally to ensure things don't change under us. The logic here builds them.
-# 
+#
 # To support caching the results, we build most of these into subdirectories of
 # `./build/` and try not to make any changes/additions in the source folders
 # themselves. In CI, we can hash the source folder to get a key for caching the
@@ -82,7 +82,7 @@ build/openssl/libssl.a build/openssl/libcrypto.a:
 	@echo "$${CI:+::group::}Building openssl"
 	@$(RM) -r build/openssl
 	@mkdir build/openssl
-	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j$(nproc)
+	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && $(MAKE)
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read build/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write build/openssl/libssl.a

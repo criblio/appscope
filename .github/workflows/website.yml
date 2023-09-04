@@ -28,7 +28,7 @@ jobs:
       contents: read
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Build schema-reference.md"
         run: make docs-generate

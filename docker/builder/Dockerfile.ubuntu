@@ -38,9 +38,11 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt-get update && \
     apt-get install -y software-properties-common gpg apt-utils libelf-dev && \
     add-apt-repository ppa:longsleep/golang-backports && \
-    apt-get update && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y \
+    apt-get update
+
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E
+
+RUN apt-get install -y \
         $GOLANG \
         autoconf \
         automake \

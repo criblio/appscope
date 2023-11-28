@@ -562,7 +562,7 @@ jobs:
   image:
     name: Build Image
     if: always()
-    needs: [info,build,test-amd64,test-arm64]
+    needs: [info,build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository

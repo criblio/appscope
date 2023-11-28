@@ -40,7 +40,7 @@ RUN apt-get update && \
     apt-get install -y software-properties-common gpg apt-utils libelf-dev && \
     add-apt-repository -y ppa:longsleep/golang-backports && \
     apt-get update && \
- #   ( gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys "$key" || gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" ) && \
+    ( gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys "$key" || gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" ) && \
     apt-get install -y \
         golang \
         autoconf \

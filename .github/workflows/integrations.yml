@@ -10,11 +10,6 @@ on:
   # Run on manually triggered workflow
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.ref }}
-  # Cancel "in progress" workflows that are superceded with later commits
-  cancel-in-progress: true
-
 jobs:
   # This is the first stage of the workflow where we do some initial setup.
   info:

@@ -7,8 +7,10 @@
 name: Build & Test
 
 on: 
-  # Run on pushes to any branch
+  # Run on pushes to master
   push:
+    branches:
+      - 'master'
     # paths-ignore does not work as expected
     # it means the workflow will run on any explicit branch
     # and any other branch where a change to a file except 
@@ -17,20 +19,8 @@ on:
     #  - 'website/**'
   # Run on manually triggered workflow
   workflow_dispatch:
-  # Run on PRs targeting the default branch or a release branches
+  # Run on PRs
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    # paths-ignore:
-    # - 'website/**'
-    branches:
-      - 'main'
-      - 'master'
-      - 'release/*'
-
-concurrency:
-  group: ${{ github.ref }}
-  # Cancel "in progress" workflows that are superceded with later commits
-  cancel-in-progress: true
 
 jobs:
   # This is the first stage of the workflow where we do some initial setup.
@@ -616,4 +606,5 @@ jobs:
                 --file docker/base/Dockerfile \
                 .
           echo "::endgroup::"
+
 

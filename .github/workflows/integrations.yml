@@ -317,7 +317,6 @@ jobs:
   test-amd64:
     name: Test x86_64/amd64
     needs: build
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix:
         test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}

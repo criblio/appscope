@@ -11,7 +11,7 @@ const maxScanTokenSize = 1024 * 1024
 
 func main() {
 
-	resp, err := http.Get("https://cribl.io")
+	resp, err := http.Get("https://www.die.net")
 	if err != nil {
 		panic(err)
 	}
@@ -22,10 +22,7 @@ func main() {
 	reader := bufio.NewReaderSize(resp.Body, maxScanTokenSize)
 
 	for {
-		token, _, err := reader.ReadLine()
-		if len(token) <= 0 {
-			fmt.Println("bad token")
-		}
+		_, _, err := reader.ReadLine()
 		if err != nil {
 			if err == io.EOF {
 				break

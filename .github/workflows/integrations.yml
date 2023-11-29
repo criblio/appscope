@@ -1,0 +1,415 @@
+#
+# AppScope - Integration Tests Workflow
+#
+# This is the GitHub Workflow to test AppScope integrations.
+#
+
+name: Integration Tests
+
+on: 
+  # Run on manually triggered workflow
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  # Cancel "in progress" workflows that are superceded with later commits
+  cancel-in-progress: true
+
+jobs:
+  # This is the first stage of the workflow where we do some initial setup.
+  info:
+    name: Get Build Info
+    runs-on: ubuntu-latest
+    steps:
+      # Clone the repo
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # This defines a number of outputs based on the tag being built if there
+      # is one. We'll use the outputs in other places.
+      - name: Get Version
+        id: version
+        uses: Simply007/get-version-action@v2.3.0
+
+      # This is our logic to decide how to tag the results and whether things
+      # get published or not.
+      - name: Get Tag
+        id: tag
+        run: |
+          if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
+              echo "tag=${{ steps.version.outputs.version-without-v }}" >> $GITHUB_OUTPUT
+              echo "push=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "branch=${GITHUB_REF#*refs/heads/}"
+            if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
+              echo "tag=next" >> "${GITHUB_OUTPUT}"
+              echo "push=true" >> "${GITHUB_OUTPUT}"
+            else
+              echo "tag=unreleased" >> "${GITHUB_OUTPUT}"
+            fi
+          fi
+
+      # Display these for troubleshooting
+      - name: Version/Tag Outputs
+        run: |
+          echo "version=\"${{ steps.version.outputs.version }}\""
+          echo "major=\"${{ steps.version.outputs.major }}\""
+          echo "minor=\"${{ steps.version.outputs.minor }}\""
+          echo "maintenance=\"${{ steps.version.outputs.patch }}\""
+          echo "prerelease=\"${{ steps.version.outputs.prerelease }}\""
+          echo "build=\"${{ steps.version.outputs.build }}\""
+          echo "is-semver=\"${{ steps.version.outputs.is-semver }}\""
+          echo "tag=\"${{ steps.tag.outputs.tag }}\""
+          echo "push=\"${{ steps.tag.outputs.push }}\""
+          echo "branch=\"${{ steps.tag.outputs.branch }}\""
+
+    # Make these available to later stages.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-semver: ${{ steps.version.outputs.is-semver }}
+      tag: ${{ steps.tag.outputs.tag }}
+      push: ${{ steps.tag.outputs.push }}
+      branch: ${{ steps.tag.outputs.branch }}
+
+  # Build and unit-test the code. This is run in a matrix; once on GitHub's
+  # standard `ubuntu-latest` runner which is x86, and once on our self-hosted
+  # ARM64 runner.
+  build:
+    name: Build
+    needs: info
+    runs-on: ${{ matrix.on }}
+    strategy:
+      matrix:
+        on: [[ubuntu-latest],[self-hosted,ARM64]]
+    steps:
+
+      # Attempt to prune any orphaned docker resources on the EC2 ARM runners
+      - name: Prune Docker Resources
+        if: ${{ matrix.on == 'ARM64' }}
+        run: |
+            docker rm --force $(docker ps -a -q) || exit 0
+            docker network prune --force || exit 0
+            docker volume prune --force || exit 0
+
+      # Some diagnostic info on the build environment. This also outputs `arch`
+      # which we use elsewhere for architecture-specific things.
+      - name: Dump Environment
+        id: env
+        run: |
+            echo "::group::env"
+            env | sort
+            echo "::endgroup::"
+            echo "::group::pwd"
+            pwd
+            echo "::endgroup::"
+            echo "::group::net"
+            hostname
+            ip addr
+            cat /etc/resolv.conf
+            resolvectl status
+            echo "::endgroup::"
+            echo "::group::uname"
+            uname -a
+            echo "::endgroup::"
+            echo "::group::cpuinfo"
+            cat /proc/cpuinfo
+            echo "::endgroup::"
+            echo "::group::lscpu"
+            lscpu
+            echo "::endgroup::"
+            echo "::group::ldd"
+            ldd --version
+            echo "::endgroup::"
+            echo "::group::free"
+            free
+            echo "::endgroup::"
+            echo "::group::home"
+            ls -la $HOME
+            echo "::endgroup::"
+            echo "arch=$(uname -m)" >> "${GITHUB_OUTPUT}"
+
+      # Clone the repos
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v3
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      # This installs the `/proc/sys/fs/binfmt` entries that allow the CI host
+      # to build for other architectures under QEMU emulation. It's not really
+      # needed here since we're only building natively but we're leaving it in
+      # since it'll be done by our build system anyway.
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Start a BuildX builder. We'll use the outputs later so give it an ID.
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
+      # We'll tell BuildX to `--cache-from` this folder to speed up the build
+      # of our `appscope-builder` image. 
+      - name: Setup Docker Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
+          upload-chunk-size: 1000000
+
+      # Cache downloaded Go dependencies.
+      - name: Setup Go Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            cli/.gobin
+            cli/.gocache
+            cli/.gomod
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-go-${{ hashFiles('cli/go.sum') }}
+          upload-chunk-size: 1000000
+
+      # Cache the cmocka build. Use a key based on a hash of all the files used
+      # in the build.
+      - name: Setup cmocka Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/cmocka
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-${{ hashFiles('contrib/*', 'contrib/cmocka/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the funchook build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup funchook Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/funchook
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-${{ hashFiles('contrib/*', 'contrib/funchook/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the funchook build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup pcre2 Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/pcre2
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-${{ hashFiles('contrib/*', 'contrib/cpre2/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the openssl build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup openssl Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/openssl
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/*', 'contrib/openssl/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the ls-hpack build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup ls-hpack Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/ls-hpack
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/*', 'contrib/ls-hpack/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the musl build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup musl Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/musl
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-musl-${{ hashFiles('contrib/*', 'contrib/musl/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the libunwind build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup libunwind Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/libunwind
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-libunwind-${{ hashFiles('contrib/*', 'contrib/libunwind/**') }}
+          upload-chunk-size: 1000000
+
+      # Cache the coredumper build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup coredumper Cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: contrib/build/coredumper
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-coredumper-${{ hashFiles('contrib/*', 'contrib/coredumper/**') }}
+          upload-chunk-size: 1000000
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v3
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      # Build our `appscope-builder` image. This should only end up using the
+      # cached image but because it needs to transfer the results from the
+      # builder container into the local Docker registry, it stills take more
+      # time that we'd like.
+      - name: Update Builder
+        env:
+          BUILDER: ${{ steps.buildx.outputs.name }}
+          CACHE_FROM: type=local,src=/tmp/.buildx-cache
+          CACHE_TO: type=local,dest=/tmp/.buildx-cache-new
+        run: make builder
+
+      # Run `make all` in the builder container to build the core and CLI.
+      - name: Build AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make all" CI=${CI}
+
+      # Run `make test` in the builder container to unit-test the core and CLI.
+      - name: Unit-Test AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make FSAN=true test" CI=${CI}
+
+      # Get a list of the integration tests to be run. The output is JSON so it
+      # can be used as a matrix deimension in a later stage. Give it an ID so
+      # we can reference the output.
+      #
+      # The egrep removes non-LTS versions of java. (9, 10, 12, 13, 14, 15, 16)
+      # This is just being done to reduce the workflow time duration.
+      - name: List Integration Tests
+        id: tests
+        run: echo "tests-${{ steps.env.outputs.arch }}=$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')" >> "${GITHUB_OUTPUT}"
+
+      - name: Print size of Binaries
+        run: |
+          echo "::group::libscope.so"
+          stat -c %s lib/linux/${{ steps.env.outputs.arch }}/libscope.so
+          echo "::endgroup::"
+          echo "::group::scope"
+          stat -c %s bin/linux/${{ steps.env.outputs.arch }}/scope
+          echo "::endgroup::"
+
+      # Upload the built binaries for use by later stages. We specify the same
+      # artifact name for this job as well as the other job for ARM. The result
+      # is a single artifact with binaries from both jobs.
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: |
+            lib/linux/${{ steps.env.outputs.arch }}/libscope.so
+            bin/linux/${{ steps.env.outputs.arch }}/scope
+
+      # To prevent the cache from growing uncbounded, we used `--cache-to` a
+      # different folder that the `--cache-from`. This moves the results of the
+      # build to where the cache action expect to find the results.
+      - name: Update Docker Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+    # Make these available to the test stage.
+    outputs:
+      tests-x86_64: ${{ steps.tests.outputs.tests-x86_64 }}
+      tests-aarch64: ${{ steps.tests.outputs.tests-aarch64 }}
+
+  # Run the x86 Integration tests.
+  test-amd64:
+    name: Test x86_64/amd64
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    strategy:
+      matrix:
+        test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+
+      - name: Chmod Binaries
+        run: chmod +x lib/linux/*/* bin/linux/*/*
+
+      # We skip this step if we're not going to push the resulting container image
+      - name: Login to Container Registry
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v3
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Update Test Image
+        run: make -C test/integration ${{ matrix.test }}-build
+
+      - name: Run Test
+        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
+
+      # We only save the resulting container image when testing the default branch
+      - name: Upload Test Image
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
+
+  # Run the ARM Integration tests.
+  test-arm64:
+    name: Test aarch64/arm64
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build.outputs.tests-aarch64) }}
+      fail-fast: false
+    runs-on: [self-hosted,ARM64]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+
+      - name: Chmod Binaries
+        run: chmod +x lib/linux/*/* bin/linux/*/*
+
+      - name: Login to Container Registry
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v3
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Update Test Image
+        run: make -C test/integration ${{ matrix.test }}-build
+
+      - name: Run Test
+        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
+
+      - name: Upload Test Image
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
+
+

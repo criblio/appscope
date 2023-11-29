@@ -464,105 +464,105 @@ jobs:
             echo "::endgroup::"
           fi
 
-  # Run the x86 Integration tests.
-  test-amd64:
-    name: Test x86_64/amd64
-    needs: build
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
-    strategy:
-      matrix:
-        test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}
-      fail-fast: false
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries
-
-      - name: Chmod Binaries
-        run: chmod +x lib/linux/*/* bin/linux/*/*
-
-      # We skip this step if we're not going to push the resulting container image
-      - name: Login to Container Registry
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Dockerhub
-        uses: docker/login-action@v3
-        with:
-          username: scopeci
-          password: ${{ secrets.SCOPECI_TOKEN }}
-
-      - name: Update Test Image
-        run: make -C test/integration ${{ matrix.test }}-build
-
-      - name: Run Test
-        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
-
-      # We only save the resulting container image when testing the default branch
-      - name: Upload Test Image
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
-
-  # Run the ARM Integration tests.
-  test-arm64:
-    name: Test aarch64/arm64
-    needs: build
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
-    strategy:
-      matrix: 
-        test: ${{ fromJson(needs.build.outputs.tests-aarch64) }}
-      fail-fast: false
-    runs-on: [self-hosted,ARM64]
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries
-
-      - name: Chmod Binaries
-        run: chmod +x lib/linux/*/* bin/linux/*/*
-
-      - name: Login to Container Registry
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Dockerhub
-        uses: docker/login-action@v3
-        with:
-          username: scopeci
-          password: ${{ secrets.SCOPECI_TOKEN }}
-
-      - name: Update Test Image
-        run: make -C test/integration ${{ matrix.test }}-build
-
-      - name: Run Test
-        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
-
-      - name: Upload Test Image
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
+          #  # Run the x86 Integration tests.
+          #  test-amd64:
+          #    name: Test x86_64/amd64
+          #    needs: build
+          #    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+          #    strategy:
+          #      matrix:
+          #        test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}
+          #      fail-fast: false
+          #    runs-on: ubuntu-latest
+          #    steps:
+          #      - name: Checkout Repository
+          #        uses: actions/checkout@v4
+          #
+          #      - name: Download Binaries
+          #        uses: actions/download-artifact@v3
+          #        with:
+          #          name: binaries
+          #
+          #      - name: Chmod Binaries
+          #        run: chmod +x lib/linux/*/* bin/linux/*/*
+          #
+          #      # We skip this step if we're not going to push the resulting container image
+          #      - name: Login to Container Registry
+          #        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          #        uses: docker/login-action@v3
+          #        with:
+          #          registry: ghcr.io
+          #          username: ${{ github.actor }}
+          #          password: ${{ secrets.GITHUB_TOKEN }}
+          #
+          #      - name: Login to Dockerhub
+          #        uses: docker/login-action@v3
+          #        with:
+          #          username: scopeci
+          #          password: ${{ secrets.SCOPECI_TOKEN }}
+          #
+          #      - name: Update Test Image
+          #        run: make -C test/integration ${{ matrix.test }}-build
+          #
+          #      - name: Run Test
+          #        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
+          #
+          #      # We only save the resulting container image when testing the default branch
+          #      - name: Upload Test Image
+          #        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          #        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
+          #
+          #  # Run the ARM Integration tests.
+          #  test-arm64:
+          #    name: Test aarch64/arm64
+          #    needs: build
+          #    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+          #    strategy:
+          #      matrix: 
+          #        test: ${{ fromJson(needs.build.outputs.tests-aarch64) }}
+          #      fail-fast: false
+          #    runs-on: [self-hosted,ARM64]
+          #    steps:
+          #      - name: Checkout Repository
+          #        uses: actions/checkout@v4
+          #
+          #      - name: Download Binaries
+          #        uses: actions/download-artifact@v3
+          #        with:
+          #          name: binaries
+          #
+          #      - name: Chmod Binaries
+          #        run: chmod +x lib/linux/*/* bin/linux/*/*
+          #
+          #      - name: Login to Container Registry
+          #        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          #        uses: docker/login-action@v3
+          #        with:
+          #          registry: ghcr.io
+          #          username: ${{ github.actor }}
+          #          password: ${{ secrets.GITHUB_TOKEN }}
+          #
+          #      - name: Login to Dockerhub
+          #        uses: docker/login-action@v3
+          #        with:
+          #          username: scopeci
+          #          password: ${{ secrets.SCOPECI_TOKEN }}
+          #
+          #      - name: Update Test Image
+          #        run: make -C test/integration ${{ matrix.test }}-build
+          #
+          #      - name: Run Test
+          #        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
+          #
+          #      - name: Upload Test Image
+          #        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          #        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
 
   # Build the container image
   image:
     name: Build Image
     if: always()
-    needs: [info,build,test-amd64,test-arm64]
+    needs: [info,build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository

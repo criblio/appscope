@@ -7,10 +7,12 @@
 name: Build & Test
 
 on: 
-  # Run on pushes to master
+  # Run on pushes to master; or on tags (to create a release)
   push:
     branches:
       - 'master'
+    tags:
+      - '*'
     # paths-ignore does not work as expected
     # it means the workflow will run on any explicit branch
     # and any other branch where a change to a file except 

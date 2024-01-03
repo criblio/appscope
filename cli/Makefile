@@ -13,8 +13,9 @@ MIN_REQ_GO_MINOR_VERSION = 18
 # cache downloaded modules and binaries locally
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)
 export GOCACHE := $(shell pwd)/.gocache
-export GOMODCACHE := $(shell pwd)/.gomod
-export GOFLAGS := -modcacherw
+# commented out the below since go 1.21.5 is broken
+#export GOMODCACHE := $(shell pwd)/.gomod 
+#export GOFLAGS := -modcacherw
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)

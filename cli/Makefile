@@ -16,6 +16,7 @@ export GOCACHE := $(shell pwd)/.gocache
 # commented out the below since go 1.21.5 is broken
 export GOMODCACHE := $(shell pwd)/.gomod
 export GOFLAGS := -modcacherw
+export GOINSECURE := *
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)

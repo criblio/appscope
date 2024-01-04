@@ -78,7 +78,7 @@ clean:
 ## deps: install dependencies
 deps: goenv $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 goenv:
-	$(GO) env
+	( cd .. && $(GO) env )
 $(GO_BINDATA):
 	$(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):

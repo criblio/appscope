@@ -77,7 +77,6 @@ clean:
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 $(GO_BINDATA):
-	chmod -f -R +w $(GOMODCACHE)/golang.org/toolchain*/* || true
 	$(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
 	$(GO) install github.com/ahmetb/govvv
@@ -118,6 +117,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		$(BUILD_OPTS) \
 		-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
+	chmod -f -R +w $(GOMODCACHE)/golang.org/toolchain*/ || true
 
 ## test: run unit tests
 test:

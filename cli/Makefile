@@ -80,9 +80,9 @@ deps: goenv $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 goenv:
 	( cd .. && $(GO) env )
 $(GO_BINDATA):
-	$(GO) install github.com/go-bindata/go-bindata/...
+	GOSUMDB=off $(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
-	$(GO) install github.com/ahmetb/govvv
+	GOSUMDB=off $(GO) install github.com/ahmetb/govvv
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(GOBIN) v1.42.1

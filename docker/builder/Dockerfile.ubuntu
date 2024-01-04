@@ -38,11 +38,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ENV key=52B59B1571A79DBC054901C0F6BC817356A3D45E
 RUN apt-get update && \
     apt-get install -y software-properties-common gpg apt-utils libelf-dev && \
-    add-apt-repository -y ppa:longsleep/golang-backports && \
     apt-get update && \
 #    ( gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys "$key" || gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" ) && \
     apt-get install -y \
-        golang \
         autoconf \
         automake \
         curl \
@@ -60,6 +58,12 @@ RUN apt-get update && \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
+
+# Install Go
+RUN curl -LO https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
+ENV PATH=$PATH:/usr/local/go/bin
+RUN go version
 
 ARG UPX_VERSION=4.0.1
 ARG CMAKE_VERSION=3.24.3

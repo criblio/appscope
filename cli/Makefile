@@ -16,7 +16,6 @@ export GOCACHE := $(shell pwd)/.gocache
 # commented out the below since go 1.21.5 is broken
 export GOMODCACHE := $(shell pwd)/.gomod
 export GOFLAGS := -modcacherw
-export GONOSUMDB := *
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
@@ -80,9 +79,9 @@ deps: goenv $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 goenv:
 	( cd .. && $(GO) env )
 $(GO_BINDATA):
-	GOSUMDB=off $(GO) install github.com/go-bindata/go-bindata/...
+	GOINSECURE=* $(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
-	GOSUMDB=off $(GO) install github.com/ahmetb/govvv
+	GOINSECURE=* $(GO) install github.com/ahmetb/govvv
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(GOBIN) v1.42.1

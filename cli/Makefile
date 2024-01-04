@@ -14,8 +14,8 @@ MIN_REQ_GO_MINOR_VERSION = 18
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)
 export GOCACHE := $(shell pwd)/.gocache
 # commented out the below since go 1.21.5 is broken
-#export GOMODCACHE := $(shell pwd)/.gomod 
-#export GOFLAGS := -modcacherw
+export GOMODCACHE := $(shell pwd)/.gomod
+export GOFLAGS := -modcacherw
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
@@ -77,6 +77,7 @@ clean:
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 $(GO_BINDATA):
+	chmod -f -R +w $(GOMODCACHE)/golang.org/toolchain*/* || true
 	$(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
 	$(GO) install github.com/ahmetb/govvv

@@ -63,7 +63,7 @@ RUN apt-get update && \
 RUN curl -LO https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
     rm -rf /usr/local/go && \
     tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
-ENV PATH="${PATH}:/usr/local/go/bin"
+ENV PATH "$PATH:/usr/local/go/bin"
 
 ARG UPX_VERSION=4.0.1
 ARG CMAKE_VERSION=3.24.3

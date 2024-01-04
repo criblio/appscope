@@ -16,6 +16,7 @@ export GOCACHE := $(shell pwd)/.gocache
 # commented out the below since go 1.21.5 is broken
 export GOMODCACHE := $(shell pwd)/.gomod
 export GOFLAGS := -modcacherw
+export GONOSUMDB := *
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
@@ -75,12 +76,11 @@ clean:
 	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
-deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
+deps: goenv $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
+goenv:
+	$(GO) env
 $(GO_BINDATA):
-	$(GO) env 1>&2
-	$(GO) version 1>&2
 	$(GO) install github.com/go-bindata/go-bindata/...
-	$(GO) version 1>&2
 $(GOVVV):
 	$(GO) install github.com/ahmetb/govvv
 $(GOLANGCI_LINT):

@@ -1,6 +1,6 @@
 module github.com/criblio/scope
 
-go 1.21.4
+go 1.21.5
 
 replace github.com/olekukonko/tablewriter => github.com/cockroachdb/tablewriter v0.0.5-0.20200105123400-bd15540e8847
 

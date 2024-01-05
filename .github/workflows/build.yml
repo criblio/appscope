@@ -193,19 +193,6 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
           upload-chunk-size: 1000000
 
-      # Cache downloaded Go dependencies.
-      - name: Setup Go Cache
-        uses: actions/cache@v3.3.2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            cli/.gobin
-            cli/.gocache
-            cli/.gomod
-          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-go-${{ hashFiles('cli/go.sum') }}
-          upload-chunk-size: 1000000
-
       # Cache the cmocka build. Use a key based on a hash of all the files used
       # in the build.
       - name: Setup cmocka Cache

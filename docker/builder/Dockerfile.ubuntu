@@ -47,7 +47,7 @@ RUN apt-get update && \
         emacs \
         gdb \
         git \
-        golang \ # also pulls in other needed deps
+        golang \
         lcov \
         libtool \
         lsof \

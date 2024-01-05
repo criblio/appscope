@@ -43,11 +43,11 @@ RUN apt-get update && \
     apt-get install -y \
         autoconf \
         automake \
-        build-essential \
         curl \
         emacs \
         gdb \
         git \
+        golang \ # also pulls in other needed deps
         lcov \
         libtool \
         lsof \

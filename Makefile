@@ -229,8 +229,7 @@ require-docker-buildx: require-docker
 # see https://github.com/multiarch/qemu-user-static
 require-qemu-binfmt: require-docker
 	@[ -n "$(wildcard /proc/sys/fs/binfmt_misc/qemu-*)" ] || \
-		docker run --rm --privileged tonistiigi/binfmt:latest --install all && \
-		docker run --rm --privileged multiarch/qemu-user-static --reset -p yes -c yes --platform $(ARCH)
+		docker run --rm --privileged tonistiigi/binfmt:latest --install all
 
 # fail of kind not in $PATH
 require-kind:

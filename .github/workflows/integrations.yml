@@ -293,7 +293,7 @@ jobs:
       # artifact name for this job as well as the other job for ARM. The result
       # is a single artifact with binaries from both jobs.
       - name: Upload Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: |
@@ -327,7 +327,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -375,7 +375,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 

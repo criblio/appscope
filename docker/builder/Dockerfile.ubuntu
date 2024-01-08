@@ -48,7 +48,7 @@ RUN apt-get update && \
         emacs \
         gdb \
         git \
-        golang \
+        build-essential \
         lcov \
         libtool \
         lsof \

@@ -39,7 +39,6 @@ void initState(void);
 void resetState(void);
 void destroyState(void);
 
-bool payloadToDiskForced(void);
 void setVerbosity(unsigned);
 void addSock(int, int, int);
 int doBlockConnection(int, const struct sockaddr *);

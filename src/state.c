@@ -47,7 +47,6 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-static bool g_force_payloads_to_disk = FALSE;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 static protocol_def_t *g_statsd_protocol_def = NULL;
@@ -77,14 +76,6 @@ list_t *g_extra_net_info_list = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-
-
-bool
-payloadToDiskForced(void)
-{
-    return g_force_payloads_to_disk;
-}
-
 
 static void
 destroyNetInfo(void *data)
@@ -309,11 +300,6 @@ initState(void)
 
     initHttpState();
     initMetricCapture();
-
-    // Some environment variables we don't want to continuously check
-    // TODO: verify if `g_force_payloads_to_disk` can be moved in cfgutils.c
-    g_force_payloads_to_disk = checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
-
 
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime

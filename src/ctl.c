@@ -1216,16 +1216,6 @@ ctlTransport(ctl_t *ctl, which_transport_t who)
     return (who == CFG_LS) ? ctl->paytrans : ctl->transport;
 }
 
-cfg_transport_t
-ctlTransportType(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return (cfg_transport_t)-1;
-
-    return (who == CFG_LS) ?
-        transportType(ctl->paytrans) :
-        transportType(ctl->transport);
-}
-
 void
 ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
 {
@@ -1242,33 +1232,35 @@ ctlEvtGet(ctl_t *ctl)
     return ctl ? ctl->evt : NULL;
 }
 
-static transport_status_t
-ctlPayConnectionStatus(ctl_t * ctl, payload_status_t payStatus) {
+transport_status_t
+ctlPayloadConnectionStatus(ctl_t *ctl) {
+    // retrieve the information about source 
+    payload_status_t payStatus = ctlPayStatus(ctl);
     transport_status_t status = {
         .configString = NULL,
         .isConnected = FALSE,
         .connectAttemptCount = 0,
         .failureString = NULL};
 
-    if ((!ctl) || (payStatus != PAYLOAD_STATUS_DISK)) {
-        return status;
+    switch (payStatus) {
+        case PAYLOAD_STATUS_DISABLE:
+            return status;
+        case PAYLOAD_STATUS_CRIBL:
+            return transportConnectionStatus(ctl->paytrans);
+        case PAYLOAD_STATUS_CTL:
+            return transportConnectionStatus(ctl->transport);
+        case PAYLOAD_STATUS_DISK:
+            status.configString = ctl->payload.dirRepr;
+            status.isConnected = TRUE;
+            return status;
+        default:
+            DBG(NULL);
+            return status;
     }
-
-    status.configString = ctl->payload.dirRepr;
-    status.isConnected = TRUE;
-
-    return status;
 }
 
 transport_status_t
-ctlConnectionStatus(ctl_t *ctl, which_transport_t who) {
-    if (who == CFG_LS) {
-        payload_status_t status = ctlPayStatus(ctl);
-        if (status == PAYLOAD_STATUS_CRIBL) {
-            return transportConnectionStatus(ctl->paytrans);
-        }
-        return ctlPayConnectionStatus(ctl, status);
-    }
+ctlConnectionStatus(ctl_t *ctl) {
     return transportConnectionStatus(ctl->transport);
 }
 

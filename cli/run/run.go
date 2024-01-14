@@ -15,6 +15,7 @@ type Config struct {
 	WorkDir       string
 	Verbosity     int
 	Payloads      bool
+	PayloadsDest  string
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string

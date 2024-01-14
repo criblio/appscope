@@ -67,6 +67,7 @@ type ScopeEventConfig struct {
 // ScopePayloadConfig represents how to capture payloads
 type ScopePayloadConfig struct {
 	Enable BoolString `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Type   string     `mapstructure:"type" json:"type" yaml:"type"`
 	Dir    string     `mapstructure:"dir" json:"dir" yaml:"dir"`
 }
 

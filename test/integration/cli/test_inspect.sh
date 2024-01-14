@@ -258,7 +258,7 @@ endtest
 # enabled cribl, payload_to_disk enable, expected to see log, events, metrics
 starttest test_inspect_cribl_enable_payload_disable
 
-SCOPE_PAYLOAD_TO_DISK=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
+SCOPE_PAYLOAD_DEST="dir" LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
 sleep 2
 PYTHON_PID=`pidof python3`
 
@@ -280,7 +280,7 @@ starttest test_inspect_cribl_enable_payload_enable
 
 PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
 unset SCOPE_CRIBL_ENABLE
-SCOPE_PAYLOAD_ENABLE=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
+SCOPE_PAYLOAD_DEST="event" SCOPE_PAYLOAD_ENABLE=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
 export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
 sleep 2
 PYTHON_PID=`pidof python3`
@@ -305,7 +305,7 @@ starttest test_inspect_cribl_enable_payload_enable_payload_to_disk_enable
 
 PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
 unset SCOPE_CRIBL_ENABLE
-SCOPE_PAYLOAD_TO_DISK=true SCOPE_PAYLOAD_ENABLE=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
+SCOPE_PAYLOAD_DEST="dir" SCOPE_PAYLOAD_ENABLE=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
 export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
 sleep 2
 PYTHON_PID=`pidof python3`

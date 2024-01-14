@@ -243,6 +243,11 @@ Environment Variables:
         Default is /tmp
     SCOPE_PAYLOAD_ENABLE
         Flag that enables payload capture.  true,false  Default is false.
+    SCOPE_PAYLOAD_DEST
+        Specifies a payload destination. Possible values, are:
+        - 'dir' - payload files are captured in the directory
+        - 'event' - payload files are captured in same destination as event
+        Default is dir.
     SCOPE_PAYLOAD_DIR
         Specifies a directory where payload capture files can be written.
         Default is /tmp

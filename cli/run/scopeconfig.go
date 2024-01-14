@@ -105,6 +105,10 @@ func (c *Config) SetDefault() error {
 				// },
 			},
 		},
+		Payload: libscope.ScopePayloadConfig{
+			Enable: "false",
+			Type:   "dir",
+			Dir:    filepath.Join(c.WorkDir, "payloads")},
 		Libscope: libscope.ScopeLibscopeConfig{
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
@@ -191,8 +195,17 @@ func (c *Config) configFromRunOpts() error {
 	if c.Payloads {
 		c.sc.Payload = libscope.ScopePayloadConfig{
 			Enable: "true",
+			Type:   "dir",
 			Dir:    filepath.Join(c.WorkDir, "payloads"),
 		}
+	}
+
+	if c.PayloadsDest != "" {
+		if c.PayloadsDest != "dir" && c.PayloadsDest != "event" {
+			return fmt.Errorf("invalid payload destination %s", c.PayloadsDest)
+		}
+		c.sc.Payload.Type = c.PayloadsDest
+		// TODO should we empty c.sc.Payload.Dir as well ?
 	}
 
 	if c.MetricsFormat != "" {

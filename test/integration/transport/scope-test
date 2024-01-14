@@ -188,9 +188,28 @@ if [ "$(wait_for_port 12345)" ]; then
     echo "When in cribl mode, verify there is only one connections when:"
     echo " 1) SCOPE_PAYLOAD_ENABLE=true"
     echo " 2) no protocols are defined"
-    echo " 3) SCOPE_PAYLOAD_TO_DISK=true"
+    echo " 3) SCOPE_PAYLOAD_DEST=dir"
     SCOPE_PAYLOAD_ENABLE=true \
-    SCOPE_PAYLOAD_TO_DISK=true \
+    SCOPE_PAYLOAD_DEST="dir" \
+    SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
+        scope run -c tls://127.0.0.1:12345 -- /bin/sleep 3 &
+    sleep 1
+    CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)
+    if (( $CON_COUNT != 1 )); then
+        echo "  FAILED - expected one connection"
+        ERR+=1
+        ERRORS="$ERRORS CRIBL/TLS_Connections"
+    else
+        echo "  PASSED"
+    fi
+    sleep 3 # wait for the scoped sleep command to finish
+
+    ############################################################################
+    echo "When in cribl mode, verify there is only one connection when:"
+    echo " 1) SCOPE_PAYLOAD_ENABLE=true"
+    echo " 2) no protocols are defined"
+    echo " 3) SCOPE_PAYLOAD_DEST is not defined"
+    SCOPE_PAYLOAD_ENABLE=true \
     SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
         scope run -c tls://127.0.0.1:12345 -- /bin/sleep 3 &
     sleep 1
@@ -206,28 +225,9 @@ if [ "$(wait_for_port 12345)" ]; then
 
     ############################################################################
     echo "When in cribl mode, verify there are two connections when:"
-    echo " 1) SCOPE_PAYLOAD_ENABLE=true"
-    echo " 2) no protocols are defined"
-    echo " 3) SCOPE_PAYLOAD_TO_DISK is not defined"
-    SCOPE_PAYLOAD_ENABLE=true \
-    SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
-        scope run -c tls://127.0.0.1:12345 -- /bin/sleep 3 &
-    sleep 1
-    CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)
-    if (( $CON_COUNT != 2 )); then
-        echo "  FAILED - expected two connections"
-        ERR+=1
-        ERRORS="$ERRORS CRIBL/TLS_Connections"
-    else
-        echo "  PASSED"
-    fi
-    sleep 3 # wait for the scoped sleep command to finish
-
-    ############################################################################
-    echo "When in cribl mode, verify there are two connections when:"
     echo " 1) SCOPE_PAYLOAD_ENABLE=false"
     echo " 2) a protocol has set payload: true"
-    echo " 3) SCOPE_PAYLOAD_TO_DISK is false"
+    echo " 3) SCOPE_PAYLOAD_DEST is event"
 
     # I'm switching to controlling things with a config file just
     # because the scope cli doesn't have a way to specify protocol
@@ -251,7 +251,7 @@ if [ "$(wait_for_port 12345)" ]; then
     echo "    regex: .*" >> $CFG_FILE
     echo "    payload: true" >> $CFG_FILE
 
-    SCOPE_PAYLOAD_TO_DISK=false \
+    SCOPE_PAYLOAD_DEST="event" \
         scope run -u $CFG_FILE -- /bin/sleep 3 &
     sleep 1
     CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)

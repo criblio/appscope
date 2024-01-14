@@ -329,7 +329,7 @@ payloadTransportEnabled(void) {
  */
 static transport_status_t
 payloadTransportStatus(void) {
-    return ctlConnectionStatus(g_ctl, CFG_LS);
+    return ctlPayloadConnectionStatus(g_ctl);
 }
 
 /*
@@ -353,7 +353,7 @@ eventsTransportEnabled(void) {
  */
 static transport_status_t
 eventsTransportStatus(void) {
-    return ctlConnectionStatus(g_ctl, CFG_CTL);
+    return ctlConnectionStatus(g_ctl);
 }
 
 /*

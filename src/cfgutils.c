@@ -73,6 +73,7 @@
 
 #define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
+#define TYPE_NODE                "type"
 #define DIR_NODE                 "dir"
 
 #define CRIBL_NODE           "cribl"
@@ -167,6 +168,12 @@ enum_map_t boolMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t payTypeMap[] = {
+    {"dir",                   TRUE},
+    {"event",                 FALSE},
+    {NULL,                    -1}
+};
+
 // forward declarations
 void cfgMtcEnableSetFromStr(config_t*, const char*);
 void cfgMtcFormatSetFromStr(config_t*, const char*);
@@ -194,6 +201,7 @@ void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
+void cfgPayTypeSetFromStr(config_t *, const char *);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 void cfgCriblEnableSetFromStr(config_t *, const char *);
@@ -530,6 +538,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LOG, value);
     } else if (!scope_strcmp(env_name, "SCOPE_PAYLOAD_ENABLE")) {
         cfgPayEnableSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_PAYLOAD_DEST")) {
+        cfgPayTypeSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_PAYLOAD_DIR")) {
         cfgPayDirSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_CMD_DBG_PATH")) {
@@ -955,6 +965,18 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgPayDirSet(cfg, value);
+}
+
+void
+cfgPayTypeSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    // see if value equals "dir"/"event"
+    if (scope_strncmp(value, "event", C_STRLEN("event")) == 0) {
+        cfgPayDirEnableSet(cfg, FALSE);
+    } else if (scope_strncmp(value, "dir", C_STRLEN("dir")) == 0) {
+        cfgPayDirEnableSet(cfg, TRUE);
+    }
 }
 
 void
@@ -1630,6 +1652,14 @@ processPayloadEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
+processPayloadType(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgPayTypeSetFromStr(config, value);
+    if (value) scope_free(value);
+}
+
+static void
 processPayloadDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
@@ -1644,6 +1674,7 @@ processPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processPayloadEnable},
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processPayloadType},
         {YAML_SCALAR_NODE,    DIR_NODE,             processPayloadDir},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
@@ -2560,6 +2591,8 @@ createPayloadJson(config_t *cfg)
 
     if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
                          valToStr(boolMap, cfgPayEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
+                         valToStr(payTypeMap, cfgPayDirEnable(cfg)))) goto err;    
     if (!cJSON_AddStringToObjLN(root, DIR_NODE,
                          cfgPayDir(cfg))) goto err;
 
@@ -2863,10 +2896,14 @@ initCtl(config_t *cfg)
      */
     payload_status_t payloadStatus = PAYLOAD_STATUS_DISABLE;
     if (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads()) {
-        if (cfgLogStreamEnable(cfg) && !payloadToDiskForced() ) {
-            payloadStatus = PAYLOAD_STATUS_CRIBL;
-        } else {
-            payloadStatus = PAYLOAD_STATUS_DISK;
+        payloadStatus = PAYLOAD_STATUS_DISK;
+        bool payloadOnDisk = cfgPayDirEnable(cfg);
+        if (payloadOnDisk == FALSE) {
+            if (cfgLogStreamEnable(cfg)) {
+                payloadStatus = PAYLOAD_STATUS_CRIBL;
+            } else if (cfgEvtEnable(cfg)) {
+                payloadStatus = PAYLOAD_STATUS_CTL;
+            }
         }
     }
     if (payloadStatus == PAYLOAD_STATUS_CRIBL) {

@@ -448,6 +448,12 @@
       "type": "string",
       "enum": ["true", "false"]
     },
+    "payload_type": {
+      "title": "type",
+      "description": "Specifies the transport mechanism on which to emit the network payloads. See `scope.yml`.",
+      "type": "string",
+      "enum": ["dir", "event"]
+    },
     "pid": {
       "title": "pid",
       "description": "The process ID of the scoped app.",

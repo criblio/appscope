@@ -80,7 +80,18 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.EqualValues(t, "true", c.sc.Payload.Enable)
+	assert.EqualValues(t, "dir", c.sc.Payload.Type)
 	assert.Equal(t, ".foo/payloads", c.sc.Payload.Dir)
+
+	c.PayloadsDest = "foo"
+	err = c.configFromRunOpts()
+	assert.Error(t, err)
+
+	c.PayloadsDest = "event"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, "event", c.sc.Payload.Type)
 
 	c.MetricsFormat = "foo"
 	err = c.configFromRunOpts()

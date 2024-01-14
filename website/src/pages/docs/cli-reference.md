@@ -117,6 +117,7 @@ scope attach --payloads 2000
       --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+      --payloadsdest string   Set destination for payloads (dir|event) (default "dir")
   -R, --rootdir               Path to root filesystem of target namespace
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
@@ -316,6 +317,7 @@ scope rules --remove chromium
       --metricformat string   Set format of metrics output (statsd|ndjson|prometheus) (default "ndjson")
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+      --payloadsdest string   Set destination for payloads (dir|event) (default "dir")
       --remove string         Remove an entry from the global rules
   -R, --rootdir string        Path to root filesystem of target namespace
       --source string         Source identifier for a rules entry
@@ -630,6 +632,7 @@ scope run -c edge -- top
       --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+      --payloadsdest string   Set destination for payloads (dir|event) (default "dir")
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```
@@ -822,6 +825,7 @@ scope watch --interval=10s -- curl https://wttr.in/94105
       --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+      --payloadsdest string   Set destination for payloads (dir|event) (default "dir")
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```

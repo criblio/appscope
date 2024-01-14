@@ -3501,7 +3501,7 @@ doEvent()
 }
 
 void
-doPayload()
+doPayload(void)
 {
     uint64_t data;
 
@@ -3607,60 +3607,71 @@ doPayload()
 
             char *bdata = NULL;
             payload_status_t payStatus = ctlPayStatus(g_ctl);
-            if (payStatus == PAYLOAD_STATUS_CRIBL) {
-                bdata = scope_calloc(1, hlen + pinfo->len);
-                if (bdata) {
-                    scope_memmove(bdata, pay, hlen);
-                    scope_strncat(bdata, "\n", hlen);
-                    scope_memmove(&bdata[hlen], pinfo->data, pinfo->len);
-                    cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
-                }
-            } else if (payStatus == PAYLOAD_STATUS_DISK) {
-                int fd;
-                char path[PATH_MAX];
-
-                ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
-                switch (pinfo->src) {
-                case NETTX:
-                case TLSTX:
-                    scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
-                    break;
-
-                case NETRX:
-                case TLSRX:
-                    scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
-                    break;
-
-                default:
-                    scope_snprintf(path, PATH_MAX, "%s/%d.na",
-                             ctlPayDir(g_ctl), g_proc.pid);
+            switch (payStatus) {
+                case PAYLOAD_STATUS_CRIBL:
+                case PAYLOAD_STATUS_CTL: {
+                    bdata = scope_calloc(1, hlen + pinfo->len);
+                    if (bdata) {
+                        scope_memmove(bdata, pay, hlen);
+                        scope_strncat(bdata, "\n", hlen);
+                        scope_memmove(&bdata[hlen], pinfo->data, pinfo->len);
+                        cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
+                    }
                     break;
                 }
+                case PAYLOAD_STATUS_DISK: {
+                    int fd;
+                    char path[PATH_MAX];
 
-                if ((fd = scope_open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
-                    if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
-                         scope_write(fd, pay, rc);
+                    ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
+                    switch (pinfo->src) {
+                    case NETTX:
+                    case TLSTX:
+                        scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
+                                ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
+                        break;
+
+                    case NETRX:
+                    case TLSRX:
+                        scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
+                                ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
+                        break;
+
+                    default:
+                        scope_snprintf(path, PATH_MAX, "%s/%d.na",
+                                ctlPayDir(g_ctl), g_proc.pid);
+                        break;
                     }
 
-                    size_t to_write = pinfo->len;
-                    size_t written = 0;
-                    int rc;
-
-                    while (to_write > 0) {
-                        rc = scope_write(fd, &pinfo->data[written], to_write);
-                        if (rc <= 0) {
-                            DBG(NULL);
-                            break;
+                    if ((fd = scope_open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                        if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
+                            scope_write(fd, pay, rc);
                         }
 
-                        written += rc;
-                        to_write -= rc;
-                    }
+                        size_t to_write = pinfo->len;
+                        size_t written = 0;
+                        int rc;
 
-                    scope_close(fd);
+                        while (to_write > 0) {
+                            rc = scope_write(fd, &pinfo->data[written], to_write);
+                            if (rc <= 0) {
+                                DBG(NULL);
+                                break;
+                            }
+
+                            written += rc;
+                            to_write -= rc;
+                        }
+
+                        scope_close(fd);
+                    }
+                    break;
                 }
+                case PAYLOAD_STATUS_DISABLE:
+                    break;
+                default:
+                    DBG(NULL);
+                    break;
             }
 
             if (bdata) scope_free(bdata);
